@@ -57,11 +57,17 @@
         <div id="grid-event-panel" style="background:rgba(0,0,0,0.4); border-radius:12px; padding:15px; border:1px solid var(--border); min-height:80px;">
             <p style="color:#94a3b8; margin:0;">选择一个方向移动，或点击当前格子触发事件。</p>
         </div>
-        <div style="display:flex; justify-content:center; gap:10px; margin-top:15px; flex-wrap:wrap;">
-            <button class="sys-btn" onclick="gridMove('up')" id="btn-up">⬆️ 上</button>
-            <button class="sys-btn" onclick="gridMove('down')" id="btn-down">⬇️ 下</button>
-            <button class="sys-btn" onclick="gridMove('left')" id="btn-left">⬅️ 左</button>
-            <button class="sys-btn" onclick="gridMove('right')" id="btn-right">➡️ 右</button>
+        <div class="grid-controls">
+            <div class="grid-controls-row">
+                <button class="sys-btn" onclick="gridMove('up')" id="btn-up">⬆️ 上</button>
+            </div>
+            <div class="grid-controls-row">
+                <button class="sys-btn" onclick="gridMove('left')" id="btn-left">⬅️ 左</button>
+                <button class="sys-btn" onclick="gridMove('right')" id="btn-right">➡️ 右</button>
+            </div>
+            <div class="grid-controls-row">
+                <button class="sys-btn" onclick="gridMove('down')" id="btn-down">⬇️ 下</button>
+            </div>
         </div>
         <button class="action-btn" style="margin-top:15px;" onclick="openWorldMap()">🗺️ 查看世界地图</button>
     </div>

@@ -23,8 +23,10 @@ const snowMobs = {
     ice_block: { id:'ice_block', icon: '🧊', name: '冰镇', hp: 55, maxHp: 55, atk: 8, speed: 6, desc:'一块被冻住的怪物，攻击会释放寒气减速敌人', special: 'slow' },
     cold_jun:  { id:'cold_jun', icon: '❄️', name: '冷俊', hp: 70, maxHp: 70, atk: 10, speed: 8, desc:'周身环绕冰霜的战士，攻击有几率冻结敌人一回合', special: 'freeze' },
     // 精英
-    river_mushroom: { id:'river_mushroom', icon: '🍄', name: '河里菇', hp: 200, maxHp: 200, atk: 16, speed: 5, desc:'冰河边诞生的巨型蘑菇，拥有冰冻领域，每回合概率冻结', special: 'freeze_aura', isElite: true },
-    zhen_erwa: { id:'zhen_erwa', icon: '👶', name: '镇二娃', hp: 170, maxHp: 170, atk: 20, speed: 10, desc:'被冰冻封印的孩童怨灵，减速光环永久降低敌人速度', special: 'slow_aura', isElite: true }
+    river_mushroom: { id:'river_mushroom', icon:'🍄', name:'河里菇', hp: 200, maxHp: 200, atk: 16, speed: 5, desc:'冰河边诞生的巨型蘑菇，拥有冰冻领域，每回合概率冻结', special: 'freeze_aura', isElite: true },
+    zhen_erwa: { id:'zhen_erwa', icon:'👶', name:'镇二娃', hp: 170, maxHp: 170, atk: 20, speed: 10, desc:'被冰冻封印的孩童怨灵，减速光环永久降低敌人速度', special: 'slow_aura', isElite: true },
+    // 特殊
+    gugugaga: { id:'gugugaga', icon:'🐦', name:'咕咕嘎嘎', hp: 90, maxHp: 90, atk: 12, speed: 16, desc:'一只奇怪的鸟形生物，5回合后会逃跑，如果没死亡会偷走一件非特殊道具', special: 'thief_escape', isElite: false }
 };
 
 // 【海岸专属怪物】
@@ -51,7 +53,11 @@ const jungleMobs = {
 const specialItems = [
     { id:'duck_art', name:'鸭俊板板', isUnique:true, type:'unique', icon:'🦆', desc:'唯一神器：全属性飙升！攻击+30, 生命+100, 吸血+15%, 暴击+10%' },
     { id:'ff_15', name:'快餐15分钟', isUnique:true, type:'unique', isFf:true, icon:'🍔', desc:'[快餐侠专属极低掉落] 唯一道具：获取后每回合双方造成伤害强制变为 0 到对方生命上限的随机值！' },
-    { id:'s7_ticket', name:'20元门票', isUnique:true, type:'unique', isSoso:true, cost: 20, icon:'🎫', desc:'[soso5专属商店概率刷出] 唯一道具：触发跳舞的被动由3回合减少为2回合一次。', exec: () => { sosoDanceInterval = 2; } }
+    { id:'s7_ticket', name:'20元门票', isUnique:true, type:'unique', isSoso:true, cost: 20, icon:'🎫', desc:'[soso5专属商店概率刷出] 唯一道具：触发跳舞的被动由3回合减少为2回合一次。', exec: () => { sosoDanceInterval = 2; } },
+    { id:'torch', name:'火把', isUnique:true, type:'unique', icon:'🔥', desc:'[冰原事件专属] 唯一道具：攻击有概率对敌人造成灼烧效果。冰原祭坛专用。', exec: () => {} },
+    { id:'altar', name:'祭坛', isUnique:true, type:'unique', icon:'⛩️', desc:'局外道具：每击杀一个怪物进度+1，击杀精英怪进度+2，击杀Boss进度+4。进度每有4点则获取一个随机道具。' },
+    { id:'mushroom_power', name:'菇菇之力', isUnique:true, type:'unique', icon:'🍄', desc:'[冰河边的蘑菇专属] 唯一道具：闪避+5%，成功闪避可以提升自己的速度。', exec: () => { player.dodge = Math.min(50, player.dodge + 5); } },
+    { id:'ice_body', name:'寒气之体', isUnique:true, type:'unique', icon:'❄️', desc:'[冰原极低掉落] 唯一道具：免疫冻结。' }
 ];
 
 // 【战斗掉落池】
@@ -62,7 +68,7 @@ const rewardPool = [
     { id:'r4', isUnique:true, type:'crit', icon:'💥', name:'弱点识破', desc:'唯一道具: 属性强化: 暴击率+4%', exec: () => player.crit=Math.min(70, player.crit+4) },
     { id:'r5', isUnique:true, type:'dodge', icon:'💨', name:'身轻如燕', desc:'唯一道具: 属性强化: 闪避率+2%', exec: () => player.dodge=Math.min(50, player.dodge+2) },
     { id:'r6', isUnique:true, type:'life', icon:'🦇', name:'嗜血狂热', desc:'唯一道具: 属性强化: 吸血+6%', exec: () => player.lifesteal+=6 },
-    { id:'r_torch', isUnique:true, type:'unique', icon:'🔥', name:'火把', desc:'唯一道具：冰原祭坛专用，可以烧毁菇菇祭祀的冰盾来源。', exec: () => {} }
+    { id:'r_altar', isUnique:true, type:'unique', icon:'⛩️', name:'祭坛', desc:'局外道具：每击杀一个怪物进度+1，击杀精英怪进度+2，击杀Boss进度+4。进度每有4点则获取一个随机道具。', exec: () => {} }
 ];
 
 // 【商店道具池】
@@ -73,9 +79,9 @@ const shopPool = [
     { id:'s4', isUnique:true, type:'unique', cost: 75, icon:'🩸', name:'吸血镰刀', desc:'唯一装备: 吸血+12%', exec: () => player.lifesteal+=12 },
     { id:'s5', isUnique:true, type:'unique', cost: 75, icon:'🎯', name:'精准狙击', desc:'唯一装备: 暴击率+8%', exec: () => player.crit=Math.min(70, player.crit+8) },
     { id:'s6', isUnique:true, type:'unique', cost: 55, icon:'❤️‍🔥', name:'生命护符', desc:'唯一装备: 最大生命大幅+60', exec: () => {player.maxHp+=60; player.hp+=60;} },
-    { id:'s_torch', isUnique:true, type:'unique', cost: 35, icon:'🔥', name:'火把', desc:'唯一道具：冰原祭坛专用。', exec: () => {} },
     { id:'s_soso', isUnique:true, type:'unique', isSoso:true, cost: 40, icon:'💿', name:'soso5道具', desc:'唯一道具: 开启奥义附带舞蹈', exec: () => hasSosoUltItem=true },
-    { id:'s_ff', isUnique:true, type:'unique', isFf:true, cost: 50, icon:'🛣️', name:'富顺街', desc:'唯一道具: 免暴击庇护', exec: () => {hasFushunItem=true; fushunBattles+=3;} }
+    { id:'s_ff', isUnique:true, type:'unique', isFf:true, cost: 50, icon:'🛣️', name:'富顺街', desc:'唯一道具: 免暴击庇护', exec: () => {hasFushunItem=true; fushunBattles+=3;} },
+    { id:'s_altar', isUnique:true, type:'unique', cost: 45, icon:'⛩️', name:'祭坛', desc:'局外道具：每击杀一个怪物进度+1，击杀精英怪进度+2，击杀Boss进度+4。进度每有4点则获取一个随机道具。', exec: () => {} }
 ];
 
 // 【镇镇之力数据】

@@ -6,6 +6,8 @@
     --border: #334155; --ice: #38bdf8;
 }
 
+*, *::before, *::after { box-sizing: border-box; }
+
 body { font-family: 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #020617, #0f172a); color: var(--text-light); text-align: center; margin: 0; padding: 20px; user-select: none; min-height: 100vh;}
 h1 { color: var(--text-main); text-shadow: 0 2px 10px rgba(251, 191, 36, 0.3); font-size: 30px; margin-bottom: 5px;}
 .subtitle { font-size: 14px; color: #94a3b8; margin-bottom: 20px; font-weight: bold; }
@@ -97,7 +99,7 @@ h1 { color: var(--text-main); text-shadow: 0 2px 10px rgba(251, 191, 36, 0.3); f
 
 /* 奖励与道具按钮 */
 .choice-container { display: flex; flex-wrap: wrap; justify-content: space-around; margin-top: 25px; gap: 15px; }
-.choice-btn { background: linear-gradient(180deg, #1e293b, #0f172a); border: 2px solid #38bdf8; color: white; padding: 20px; border-radius: 10px; cursor: pointer; flex: 1; min-width: 28%; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); position: relative;}
+.choice-btn { background: linear-gradient(180deg, #1e293b, #0f172a); border: 2px solid #38bdf8; color: white; padding: 14px 16px; border-radius: 10px; cursor: pointer; flex: 1 1 0; min-width: 0; max-width: 100%; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); position: relative; word-break: break-word; font-size: 14px;}
 .choice-btn:hover { background: #334155; transform: scale(1.03); border-color: var(--text-main);}
 .choice-btn p { font-size: 14px; color: #cbd5e1; }
 .choice-btn:disabled, .choice-btn.disabled {
@@ -190,6 +192,11 @@ button.action-btn { background: linear-gradient(90deg, #d97706, #f59e0b); color:
 /* 网格地图容器 - 移除滚动条 */
 #grid-container { display: grid; justify-content: center; padding: 12px; border-radius: 14px; background: rgba(2,6,23,0.35); border: 1px solid rgba(71,85,105,0.25); }
 
+/* 方向控制按钮：上下左右布局 */
+.grid-controls { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 15px; }
+.grid-controls-row { display: flex; justify-content: center; gap: 10px; }
+.grid-controls .sys-btn { min-width: 80px; }
+
 /* 通用动画 */
 @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 
@@ -234,17 +241,17 @@ button.action-btn { background: linear-gradient(90deg, #d97706, #f59e0b); color:
     #event-title { font-size: 20px; }
     #event-desc { font-size: 14px; padding: 12px 14px; }
 
-    /* 战斗UI：角色卡片纵向堆叠 */
-    .arena { flex-direction: column; gap: 10px; }
-    .fighter { padding: 14px 12px; border-radius: 14px; }
-    .fighter .char-icon { font-size: 36px; }
-    .fighter .char-name { font-size: 15px; margin-bottom: 10px; }
-    .hp-bar-bg { height: 18px; border-radius: 9px; }
-    .hp-text { font-size: 12px; }
-    .fighter-stats { font-size: 10px; }
-    .vs { flex-direction: row; gap: 10px; margin: 6px 0; }
-    .vs-text { font-size: 24px; }
-    .turn-counter { font-size: 12px; }
+    /* 战斗UI：保持左右排版，适当缩小 */
+    .arena { flex-direction: row; gap: 8px; }
+    .fighter { padding: 10px 8px; border-radius: 12px; }
+    .fighter .char-icon { font-size: 28px; }
+    .fighter .char-name { font-size: 13px; margin-bottom: 8px; }
+    .hp-bar-bg { height: 16px; border-radius: 8px; }
+    .hp-text { font-size: 11px; }
+    .fighter-stats { font-size: 9px; gap: 3px; }
+    .vs { flex-direction: column; gap: 6px; margin: 0 4px; }
+    .vs-text { font-size: 20px; }
+    .turn-counter { font-size: 11px; }
 
     /* 技能按钮加大 */
     .skill-bar { flex-direction: column; gap: 8px; }
@@ -255,8 +262,8 @@ button.action-btn { background: linear-gradient(90deg, #d97706, #f59e0b); color:
 
     /* 奖励/商店按钮：手机上单列 */
     .choice-container { flex-direction: column; gap: 10px; }
-    .choice-btn { min-width: auto; width: 100%; padding: 14px; font-size: 14px; }
-    .choice-btn h3 { font-size: 16px; margin: 0 0 4px 0; }
+    .choice-btn { min-width: auto; width: 100%; padding: 12px 14px; font-size: 13px; }
+    .choice-btn h3 { font-size: 15px; margin: 0 0 4px 0; }
 
     button.action-btn { padding: 12px 20px; font-size: 16px; width: 100%; margin-top: 16px; }
 
@@ -279,7 +286,9 @@ button.action-btn { background: linear-gradient(90deg, #d97706, #f59e0b); color:
     #grid-event-panel .choice-btn { padding: 12px 16px; font-size: 14px; }
 
     /* 方向按钮加大便于点击 */
-    #btn-up, #btn-down, #btn-left, #btn-right { padding: 10px 16px; font-size: 14px; }
+    .grid-controls { gap: 8px; }
+    .grid-controls-row { gap: 8px; }
+    .grid-controls .sys-btn { min-width: 72px; padding: 10px 14px; font-size: 14px; }
 
     /* 图鉴标签 */
     .collab-badge { font-size: 9px; padding: 2px 6px; top: -6px; right: -6px; }

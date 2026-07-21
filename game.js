@@ -474,7 +474,7 @@ function resolveSnowEventOption(result) {
         if(result.type === 'combat_random') {
             // 根据当前区域随机选择小怪
             let pools = {
-                snow: ['ice_block', 'cold_jun'],
+                snow: ['ice_block', 'cold_jun', 'gugugaga'],
                 coast: ['crab', 'seagull'],
                 jungle: ['snake', 'monkey']
             };
@@ -516,10 +516,139 @@ function resolveSnowEventOption(result) {
         panel.innerHTML = `<p>${result.text || (result.amount > 0 ? '恢复了生命值。' : '受到了伤害。')}</p>`;
         renderGrid();
     }
+    else if(result.type === 'custom') {
+        handleCustomEvent(result.action, panel);
+    }
     else if(result.type === 'nothing') {
         regionGridInEvent = false;
         panel.innerHTML = '<p style="color:#94a3b8;">什么都没发生。</p>';
         renderGrid();
+    }
+}
+
+// 自定义事件处理
+function handleCustomEvent(action, panel) {
+    switch(action) {
+        case 'mushroom_help': {
+            // 给他帮助：需要拥有祭坛道具，获得菇菇之力
+            let hasAltar = ownedItems.some(it => it.id === 'altar' || it.id === 'r_altar' || it.id === 's_altar');
+            if(!hasAltar) {
+                panel.innerHTML = '<p style="color:#94a3b8;">你没有祭坛道具，无法帮助河里菇。</p>';
+                regionGridInEvent = false;
+                renderGrid();
+            } else {
+                // 获得菇菇之力
+                let item = specialItems.find(i => i.id === 'mushroom_power');
+                if(item && !ownedItems.some(o => o.id === 'mushroom_power')) {
+                    if(item.exec) item.exec();
+                    ownedItems.push(item);
+                }
+                panel.innerHTML = '<p style="color:var(--heal);">🍄 河里菇感受到了祭坛的力量，赐予你菇菇之力！闪避+5%，成功闪避可提升速度。</p>';
+                regionGridInEvent = false;
+                updateTopBar();
+                renderGrid();
+            }
+            break;
+        }
+        case 'cold_jun_greet': {
+            // 大喊打招呼：50%概率直接胜利获得奖励，50%扣血
+            if(Math.random() < 0.5) {
+                let rewardGold = Math.floor(Math.random() * 20 + 15);
+                gold += rewardGold;
+                panel.innerHTML = `<p style="color:var(--gold);">🎉 冷俊被你吓了一跳，丢下${rewardGold}金币逃走了！</p>`;
+                regionGridInEvent = false;
+                updateTopBar();
+                renderGrid();
+            } else {
+                player.hp = Math.max(1, player.hp - 25);
+                panel.innerHTML = '<p style="color:var(--atk);">❄️ 冷俊被激怒了，朝你猛攻一击！损失25生命。</p>';
+                regionGridInEvent = false;
+                updateTopBar();
+                renderGrid();
+            }
+            break;
+        }
+        case 'zhen_erwa_chant': {
+            // 念诵超度经文：50%削弱属性，50%增强属性
+            if(Math.random() < 0.5) {
+                // 成功超度，削弱镇二娃属性（存入全局，下次战斗生效）
+                window._zhenErwaWeakened = true;
+                panel.innerHTML = '<p style="color:var(--heal);">📿 超度经文生效了！镇二娃的怨灵被安抚，它的属性已被削弱。</p>';
+            } else {
+                window._zhenErwaBuffed = true;
+                panel.innerHTML = '<p style="color:var(--atk);">😡 经文激怒了镇二娃！它的怨灵之力更加狂暴了。</p>';
+            }
+            regionGridInEvent = false;
+            renderGrid();
+            break;
+        }
+        case 'frozen_chest_smash': {
+            // 砸开冰层：随机金币
+            let amount = Math.floor(Math.random() * 25 + 10);
+            gold += amount;
+            panel.innerHTML = `<p style="color:var(--gold);">🪙 砸开宝箱，获得 ${amount} 寻宝币！</p>`;
+            regionGridInEvent = false;
+            updateTopBar();
+            renderGrid();
+            break;
+        }
+        case 'frozen_chest_melt': {
+            // 用体温融化：有概率获得寒气之体
+            if(Math.random() < 0.15) {
+                let item = specialItems.find(i => i.id === 'ice_body');
+                if(item && !ownedItems.some(o => o.id === 'ice_body')) {
+                    ownedItems.push(item);
+                    panel.innerHTML = '<p style="color:var(--heal);">❄️ 你的体温与寒冰融合，获得了寒气之体！免疫冻结效果。</p>';
+                } else {
+                    panel.innerHTML = '<p style="color:#94a3b8;">你费尽全力融化冰层，但什么都没发生。</p>';
+                }
+            } else {
+                player.hp = Math.max(1, player.hp - 20);
+                panel.innerHTML = '<p style="color:var(--atk);">❄️ 冻伤了，损失20生命。冰层纹丝不动。</p>';
+            }
+            regionGridInEvent = false;
+            updateTopBar();
+            renderGrid();
+            break;
+        }
+        case 'hot_spring_bath': {
+            // 泡个温泉：随机百分比恢复
+            let pct = (Math.random() * 0.4 + 0.2).toFixed(2); // 20%~60%
+            let heal = Math.floor(player.maxHp * pct);
+            player.hp = Math.min(player.maxHp, player.hp + heal);
+            panel.innerHTML = `<p style="color:var(--heal);">♨️ 泡温泉恢复了 ${Math.floor(pct*100)}% 生命（${heal}点）！</p>`;
+            regionGridInEvent = false;
+            updateTopBar();
+            renderGrid();
+            break;
+        }
+        case 'ice_bridge_dash': {
+            // 全力冲刺：有概率扣更多血
+            if(Math.random() < 0.4) {
+                player.hp = Math.max(1, player.hp - 25);
+                panel.innerHTML = '<p style="color:var(--atk);">🌉 冰桥在你脚下断裂！你重重摔了下去，损失25生命。</p>';
+            } else {
+                panel.innerHTML = '<p style="color:var(--heal);">🌉 你成功冲刺过了冰桥！</p>';
+            }
+            regionGridInEvent = false;
+            updateTopBar();
+            renderGrid();
+            break;
+        }
+        case 'ice_bridge_retreat': {
+            // 退回去找别的路：无法通过此节点
+            panel.innerHTML = '<p style="color:var(--atk);">🌉 你试图退回去，但来时的路已经被雪崩掩埋，无法通过此节点了。</p>';
+            // 标记当前节点不可通行（设置一个标记，下次渲染时禁用）
+            let cell = getCurrentNode();
+            if(cell) cell.blocked = true;
+            regionGridInEvent = false;
+            renderGrid();
+            break;
+        }
+        default:
+            panel.innerHTML = '<p style="color:#94a3b8;">什么都没发生。</p>';
+            regionGridInEvent = false;
+            renderGrid();
     }
 }
 
@@ -538,6 +667,29 @@ function prepareRegionMob(mobId) {
     // 特殊标记用于战斗逻辑（保留 isSnowMob 兼容旧逻辑，新增 isRegionMob）
     enemy.isRegionMob = true;
     if(currentRegion === 'snow') enemy.isSnowMob = true;
+
+    // 镇二娃超度效果
+    if(mobId === 'zhen_erwa') {
+        if(window._zhenErwaWeakened) {
+            enemy.maxHp = Math.floor(enemy.maxHp * 0.7);
+            enemy.hp = enemy.maxHp;
+            enemy.atk = Math.floor(enemy.atk * 0.7);
+            log(`<span class="log-heal">📿 镇二娃被超度削弱！生命和攻击降低30%。</span>`);
+            window._zhenErwaWeakened = false;
+        } else if(window._zhenErwaBuffed) {
+            enemy.maxHp = Math.floor(enemy.maxHp * 1.3);
+            enemy.hp = enemy.maxHp;
+            enemy.atk = Math.floor(enemy.atk * 1.3);
+            log(`<span class="log-atk">😡 镇二娃被激怒！生命和攻击提升30%。</span>`);
+            window._zhenErwaBuffed = false;
+        }
+    }
+
+    // 咕咕嘎嘎初始化
+    if(mobId === 'gugugaga') {
+        enemy.escapeTurn = 5;
+        enemy.turnCount = 0;
+    }
 }
 
 function prepareRegionBoss(mode) {
@@ -794,6 +946,28 @@ function battleTick() {
 
     log(`<span class="log-turn">=== 第 ${turn} 回合 ===</span>`);
 
+    // 咕咕嘎嘎逃跑逻辑
+    if(enemy && enemy.id === 'gugugaga') {
+        enemy.turnCount++;
+        if(enemy.turnCount >= enemy.escapeTurn) {
+            // 逃跑并偷道具
+            log(`<span class="log-boss">🐦 咕咕嘎嘎拍打着翅膀逃跑了！它趁机从你身上偷走了一件道具...</span>`);
+            // 偷走一件非特殊道具
+            let stealable = ownedItems.filter(it => it.id !== 'duck_art' && it.id !== 'ff_15' && it.id !== 's7_ticket');
+            if(stealable.length > 0) {
+                let stolen = stealable[Math.floor(Math.random() * stealable.length)];
+                ownedItems = ownedItems.filter(it => it.id !== stolen.id);
+                log(`<span class="log-atk">🐦 咕咕嘎嘎偷走了你的 ${stolen.name}！</span>`);
+            } else {
+                log(`<span class="log-skill">🐦 你身上没有可偷的道具，咕咕嘎嘎空手而归。</span>`);
+            }
+            enemy.hp = 0;
+            updateBattleUI(); updateTopBar();
+            checkDeath();
+            return;
+        }
+    }
+
     // 菇菇祭祀冰盾生成逻辑：每2回合产生一层冰盾（产生时不攻击）
     if(enemy && enemy.isSnowBoss && !enemy.torchUsed) {
         enemy.turnCounter++;
@@ -955,6 +1129,15 @@ function processAction(atkChar, defChar) {
             if(defChar.id === 'ox') defChar.atk += Math.floor(defChar.maxHp * 0.02);
             if(defChar.id === 'dog') { let ref = Math.floor(damage * 0.3); atkChar.hp -= ref; }
 
+            // 火把灼烧效果
+            if(isPlayerAtk && ownedItems.some(it => it.id === 'torch')) {
+                if(Math.random() < 0.3) {
+                    let burn = Math.floor(damage * 0.2);
+                    defChar.hp -= burn;
+                    log(`<span class="log-atk">🔥 [火把灼烧] 敌人被火焰灼烧，额外受到 ${burn} 点伤害！</span>`);
+                }
+            }
+
             // 冰盾层数衰减：受击少一层
             if(defChar.isSnowBoss && defChar.iceShield > 0) {
                 defChar.iceShield--;
@@ -963,12 +1146,17 @@ function processAction(atkChar, defChar) {
 
             // 菇菇祭祀冻结条：攻击命中玩家时积累
             if(atkChar.isSnowBoss && defChar.id === player.id) {
-                atkChar.freezeBar++;
-                log(`<span class="log-boss-warning">❄️ 寒气入侵！冻结条 ${atkChar.freezeBar}/${atkChar.freezeThreshold}</span>`);
-                if(atkChar.freezeBar >= atkChar.freezeThreshold) {
-                    defChar.frozenTurns = 1;
-                    atkChar.freezeBar = 0;
-                    log(`<span class="log-boss-warning">❄️❄️❄️ 你被完全冻结！下一回合无法行动！</span>`);
+                // 寒气之体免疫冻结
+                if(ownedItems.some(it => it.id === 'ice_body')) {
+                    log(`<span class="log-skill">❄️ [寒气之体] 寒气被你吸收，免疫冻结！</span>`);
+                } else {
+                    atkChar.freezeBar++;
+                    log(`<span class="log-boss-warning">❄️ 寒气入侵！冻结条 ${atkChar.freezeBar}/${atkChar.freezeThreshold}</span>`);
+                    if(atkChar.freezeBar >= atkChar.freezeThreshold) {
+                        defChar.frozenTurns = 1;
+                        atkChar.freezeBar = 0;
+                        log(`<span class="log-boss-warning">❄️❄️❄️ 你被完全冻结！下一回合无法行动！</span>`);
+                    }
                 }
             }
 
@@ -982,7 +1170,9 @@ function processAction(atkChar, defChar) {
 
             // 冷俊冻结
             if(atkChar.isSnowMob && atkChar.special === 'freeze' && defChar.id === player.id) {
-                if(Math.random() < 0.35) {
+                if(ownedItems.some(it => it.id === 'ice_body')) {
+                    log(`<span class="log-skill">❄️ [寒气之体] 寒气被你吸收，免疫冻结！</span>`);
+                } else if(Math.random() < 0.35) {
                     defChar.frozenTurns = 1;
                     log(`<span class="log-boss-warning">❄️ [冷俊] 你被冻结一回合！</span>`);
                 }
@@ -990,7 +1180,9 @@ function processAction(atkChar, defChar) {
 
             // 河里菇冰冻领域
             if(atkChar.isSnowMob && atkChar.special === 'freeze_aura' && defChar.id === player.id) {
-                if(Math.random() < 0.4) {
+                if(ownedItems.some(it => it.id === 'ice_body')) {
+                    log(`<span class="log-skill">❄️ [寒气之体] 冰冻领域对你无效！</span>`);
+                } else if(Math.random() < 0.4) {
                     defChar.frozenTurns = 1;
                     log(`<span class="log-boss-warning">🍄 [河里菇] 冰冻领域让你无法动弹！</span>`);
                 }
@@ -1002,7 +1194,14 @@ function processAction(atkChar, defChar) {
                 log(`<span class="log-boss">👶 [镇二娃] 怨灵哀嚎降低你的速度！</span>`);
             }
 
-        } else if (!isHit) { log(`${defChar.name} 闪避了攻击！💨`); }
+        } else if (!isHit) {
+            log(`${defChar.name} 闪避了攻击！💨`);
+            // 菇菇之力：闪避成功后提升速度
+            if(isPlayerAtk && ownedItems.some(it => it.id === 'mushroom_power')) {
+                player.speed += 1;
+                log(`<span class="log-skill">🍄 [菇菇之力] 闪避成功，速度+1！（当前速度 ${player.speed}）</span>`);
+            }
+        }
         if(checkDeath()) return false;
     }
     return true;
@@ -1153,6 +1352,28 @@ function endCombat() {
 
     let dropGold = (isGridBoss || (currentNode && currentNode.type === 'boss')) ? Math.floor(Math.random()*30+60) : Math.floor(Math.random()*15 + 15);
     gold += dropGold; updateTopBar();
+
+    // 祭坛进度系统
+    let hasAltar = ownedItems.some(it => it.id === 'altar' || it.id === 'r_altar' || it.id === 's_altar');
+    if(hasAltar) {
+        let progress = 1;
+        if(enemy && enemy.isElite) progress = 2;
+        if(enemy && (enemy.isSnowBoss || enemy.isCoastBoss || enemy.isJungleBoss)) progress = 4;
+        window._altarProgress = (window._altarProgress || 0) + progress;
+        log(`<span class="log-skill">⛩️ [祭坛] 进度 +${progress}（当前 ${window._altarProgress}）</span>`);
+        while(window._altarProgress >= 4) {
+            window._altarProgress -= 4;
+            // 发放随机道具
+            let randomItems = [...rewardPool, ...shopPool].filter(it => !ownedItems.some(o => o.id === it.id));
+            if(randomItems.length > 0) {
+                let item = randomItems[Math.floor(Math.random() * randomItems.length)];
+                if(item.exec) item.exec();
+                ownedItems.push(item);
+                log(`<span class="log-ult">⛩️ [祭坛] 进度满4点！你获得了 ${item.name}！</span>`);
+            }
+        }
+        updateTopBar();
+    }
 
     // 网格地图 Boss 战斗
     if(fromGrid && isGridBoss) {

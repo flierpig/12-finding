@@ -210,7 +210,7 @@ const snowEvents = [
         options: [
             { text: '打扰他', result: { type: 'combat', mobId: 'river_mushroom' } },
             { text: '悄悄离开', result: { type: 'move' } },
-            { text: '给他帮助', result: { type: 'move' } }
+            { text: '给他帮助', result: { type: 'custom', action: 'mushroom_help' } }
         ]
     },
     {
@@ -233,7 +233,7 @@ const snowEvents = [
         options: [
             { text: '偷袭他', result: { type: 'combat', mobId: 'cold_jun' } },
             { text: '悄悄绕开', result: { type: 'move' } },
-            { text: '大喊打招呼', result: { type: 'combat', mobId: 'cold_jun' } }
+            { text: '大喊打招呼', result: { type: 'custom', action: 'cold_jun_greet' } }
         ]
     },
     {
@@ -245,7 +245,7 @@ const snowEvents = [
         options: [
             { text: '打碎冰层', result: { type: 'combat', mobId: 'zhen_erwa' } },
             { text: '赶紧离开', result: { type: 'move' } },
-            { text: '念诵超度经文', result: { type: 'move' } }
+            { text: '念诵超度经文', result: { type: 'custom', action: 'zhen_erwa_chant' } }
         ]
     },
     {
@@ -255,8 +255,8 @@ const snowEvents = [
         desc: '雪堆里半埋着一个被坚冰封住的宝箱，隐约能看到里面透出金光。',
         type: 'event',
         options: [
-            { text: '砸开冰层', result: { type: 'gold', amount: 25 } },
-            { text: '用体温融化', result: { type: 'heal', amount: -20, text: '冻伤了，损失20生命' } },
+            { text: '砸开冰层', result: { type: 'custom', action: 'frozen_chest_smash' } },
+            { text: '用体温融化', result: { type: 'custom', action: 'frozen_chest_melt' } },
             { text: '无视它', result: { type: 'move' } }
         ]
     },
@@ -267,7 +267,7 @@ const snowEvents = [
         desc: '一片冒着热气的温泉池出现在雪地中，水温刚好，让人忍不住想跳进去。',
         type: 'event',
         options: [
-            { text: '泡个温泉', result: { type: 'heal', amount: 0.4, text: '恢复了40%生命' } },
+            { text: '泡个温泉', result: { type: 'custom', action: 'hot_spring_bath' } },
             { text: '收集温泉水', result: { type: 'move' } },
             { text: '警惕地离开', result: { type: 'move' } }
         ]
@@ -336,9 +336,9 @@ const snowEvents = [
         desc: '你走在一条天然的冰桥上，脚下传来不祥的碎裂声，桥身开始摇晃。',
         type: 'event',
         options: [
-            { text: '全力冲刺过去', result: { type: 'move' } },
+            { text: '全力冲刺过去', result: { type: 'custom', action: 'ice_bridge_dash' } },
             { text: '小心翼翼地走', result: { type: 'heal', amount: -10, text: '冰桥断裂，你勉强抓住边缘爬上来，损失10生命' } },
-            { text: '退回去找别的路', result: { type: 'move' } }
+            { text: '退回去找别的路', result: { type: 'custom', action: 'ice_bridge_retreat' } }
         ]
     },
     {
@@ -745,7 +745,7 @@ function generateRegionGrid(eventPool, bossEvent, regionId) {
         });
     });
 
-    ensureConnected(nodes, nodeMap);
+    ensureConnected(nodes, nodeMap, startNode);
 
     // 分配事件：遵循规则
     assignEventsToNodes(nodes, eventPool, regionId);
@@ -845,11 +845,13 @@ function createNodeAt(r, c, nodes, nodeMap, width, height) {
     return node;
 }
 
-function ensureConnected(nodes, nodeMap) {
+function ensureConnected(nodes, nodeMap, startNode) {
     if(nodes.length === 0) return;
+
+    // 从起点开始做BFS，找到所有可达节点
     let visited = new Set();
-    let queue = [nodes[0].id];
-    visited.add(nodes[0].id);
+    let queue = [startNode.id];
+    visited.add(startNode.id);
     while(queue.length > 0) {
         let cur = nodeMap[queue.shift()];
         cur.connections.forEach(nextId => {
@@ -860,21 +862,66 @@ function ensureConnected(nodes, nodeMap) {
         });
     }
 
-    // 如果有孤立节点，连接到最近的已访问节点
+    // 连接孤立节点到已访问的连通分量
     let isolated = nodes.filter(n => !visited.has(n.id));
+    let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+
     isolated.forEach(node => {
-        // 找到距离最近的已连接节点
-        let nearest = null, minDist = Infinity;
-        nodes.forEach(other => {
-            if(visited.has(other.id)) {
-                let dist = Math.abs(node.r - other.r) + Math.abs(node.c - other.c);
-                if(dist < minDist) { minDist = dist; nearest = other; }
+        let nearest = null;
+
+        // 优先找相邻的已访问节点
+        for(let d of dirs) {
+            let nr = node.r + d[0], nc = node.c + d[1];
+            let key = `${nr},${nc}`;
+            if(nodeMap[key] && visited.has(key)) {
+                nearest = nodeMap[key];
+                break;
             }
-        });
+        }
+
+        // 如果没有相邻的已访问节点，找距离最近的已访问节点
+        if(!nearest) {
+            let minDist = Infinity;
+            nodes.forEach(other => {
+                if(visited.has(other.id)) {
+                    let dist = Math.abs(node.r - other.r) + Math.abs(node.c - other.c);
+                    if(dist < minDist) { minDist = dist; nearest = other; }
+                }
+            });
+        }
+
         if(nearest) {
-            node.connections.push(nearest.id);
-            nearest.connections.push(node.id);
-            // 递归确保新连接的节点也能被访问到
+            // 如果相邻，直接连接
+            if(Math.abs(node.r - nearest.r) + Math.abs(node.c - nearest.c) === 1) {
+                if(!node.connections.includes(nearest.id)) node.connections.push(nearest.id);
+                if(!nearest.connections.includes(node.id)) nearest.connections.push(node.id);
+            } else {
+                // 如果不相邻，沿着最短路径逐步连接（先水平后垂直）
+                let cr = nearest.r, cc = nearest.c;
+                let prev = nearest;
+                // 水平移动
+                while(cc !== node.c) {
+                    cc += Math.sign(node.c - cc);
+                    let key = `${cr},${cc}`;
+                    if(nodeMap[key]) {
+                        if(!prev.connections.includes(key)) prev.connections.push(key);
+                        if(!nodeMap[key].connections.includes(prev.id)) nodeMap[key].connections.push(prev.id);
+                        visited.add(key);
+                        prev = nodeMap[key];
+                    }
+                }
+                // 垂直移动
+                while(cr !== node.r) {
+                    cr += Math.sign(node.r - cr);
+                    let key = `${cr},${cc}`;
+                    if(nodeMap[key]) {
+                        if(!prev.connections.includes(key)) prev.connections.push(key);
+                        if(!nodeMap[key].connections.includes(prev.id)) nodeMap[key].connections.push(prev.id);
+                        visited.add(key);
+                        prev = nodeMap[key];
+                    }
+                }
+            }
             visited.add(node.id);
         }
     });
