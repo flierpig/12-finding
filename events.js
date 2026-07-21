@@ -392,9 +392,9 @@ function getSnowBossOptions() {
 // 生成一个不规则的网格地图，节点之间随机连接
 // 不再是规则正方形，而是纵横交错的路径网络
 function generateSnowGrid() {
-    // 地图尺寸：8-12个节点宽，8-14个节点高，更大更开阔
-    let width = 8 + Math.floor(Math.random() * 5);  // 8-12
-    let height = 8 + Math.floor(Math.random() * 7); // 8-14
+    // 地图尺寸：限制为6-8宽，6-9高，确保一屏显示无需滚动
+    let width = 6 + Math.floor(Math.random() * 3);  // 6-8
+    let height = 6 + Math.floor(Math.random() * 4); // 6-9
     let nodes = [];
     let nodeMap = {}; // key: "r,c" -> node
 

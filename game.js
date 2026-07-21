@@ -288,8 +288,8 @@ function getCurrentNode() {
 function renderGrid() {
     let container = document.getElementById('grid-container');
     container.innerHTML = '';
-    container.style.gridTemplateColumns = `repeat(${snowGrid.width}, 54px)`;
-    container.style.gridTemplateRows = `repeat(${snowGrid.height}, 54px)`;
+    container.style.gridTemplateColumns = `repeat(${snowGrid.width}, 50px)`;
+    container.style.gridTemplateRows = `repeat(${snowGrid.height}, 50px)`;
 
     for(let r = 0; r < snowGrid.height; r++) {
         for(let c = 0; c < snowGrid.width; c++) {
@@ -308,7 +308,7 @@ function renderGrid() {
                 div.innerText = '';
             } else if(isCurrent) {
                 div.classList.add('current');
-                div.innerText = '🧑‍🦯';
+                div.innerText = '📍';
             } else if(node.type === 'boss') {
                 if(node.visited) {
                     div.classList.add('visited');

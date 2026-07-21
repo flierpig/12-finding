@@ -14,9 +14,9 @@ h1 { color: var(--text-main); text-shadow: 0 2px 10px rgba(251, 191, 36, 0.3); f
 .desc-text { font-size: 18px; margin-bottom: 30px; }
 .ult-status-text { color: var(--ult); font-size: 14px; font-weight: bold; }
 
-/* 悬浮系统按钮 */
-.sys-nav { position: fixed; top: 15px; right: 20px; display: flex; gap: 10px; z-index: 50; }
-.sys-btn { background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border); color: var(--text-light); padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; backdrop-filter: blur(5px); transition: 0.2s;}
+/* 悬浮系统按钮 - 改为非固定，不遮挡视野 */
+.sys-nav { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
+.sys-btn { background: rgba(30, 41, 59, 0.85); border: 1px solid var(--border); color: var(--text-light); padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; backdrop-filter: blur(5px); transition: 0.2s; font-size: 13px;}
 .sys-btn:hover { background: var(--text-main); color: #000; }
 
 .screen { max-width: 800px; margin: 0 auto; background: var(--panel-bg); backdrop-filter: blur(10px); padding: 25px; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -145,18 +145,18 @@ button.action-btn { background: linear-gradient(90deg, #d97706, #f59e0b); color:
 
 /* 网格地图 */
 .grid-cell {
-    width: 52px; height: 52px;
+    width: 48px; height: 48px;
     background: rgba(15,23,42,0.6);
     border: 1px solid rgba(71,85,105,0.4);
     border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 22px; cursor: pointer;
+    font-size: 20px; cursor: pointer;
     transition: 0.25s; position: relative;
     box-shadow: inset 0 0 8px rgba(56,189,248,0.05);
 }
 .grid-cell:hover { border-color: var(--text-main); transform: scale(1.12); z-index: 10; box-shadow: 0 0 18px rgba(251,191,36,0.25); }
 .grid-cell.empty { background: transparent; border: none; cursor: default; box-shadow: none; }
-.grid-cell.current { border-color: var(--gold); box-shadow: 0 0 20px rgba(245,158,11,0.7); background: rgba(245,158,11,0.25); animation: pulse 2s infinite; }
+.grid-cell.current { border-color: #f59e0b; border-width: 3px; box-shadow: 0 0 24px rgba(245,158,11,0.8), inset 0 0 10px rgba(245,158,11,0.3); background: rgba(245,158,11,0.35); animation: pulse 2s infinite; }
 .grid-cell.visited { border-color: #475569; background: rgba(30,41,59,0.55); opacity: 0.85; }
 .grid-cell.boss { border-color: #ef4444; background: rgba(239,68,68,0.22); animation: pulseRed 2s infinite; }
 .grid-cell.reachable { border-color: rgba(56,189,248,0.6); background: rgba(56,189,248,0.15); animation: faintGlow 2.5s infinite; }
@@ -187,8 +187,8 @@ button.action-btn { background: linear-gradient(90deg, #d97706, #f59e0b); color:
 #grid-event-panel p { color: #cbd5e1; margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; }
 #grid-event-panel .choice-btn { min-width: auto; padding: 14px 20px; margin: 8px 0; font-size: 15px; }
 
-/* 网格地图容器 */
-#grid-container { overflow: auto; max-width: 100%; padding: 10px; border-radius: 14px; background: rgba(2,6,23,0.35); border: 1px solid rgba(71,85,105,0.25); }
+/* 网格地图容器 - 移除滚动条 */
+#grid-container { display: grid; justify-content: center; padding: 12px; border-radius: 14px; background: rgba(2,6,23,0.35); border: 1px solid rgba(71,85,105,0.25); }
 
 /* 通用动画 */
 @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
