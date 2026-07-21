@@ -395,22 +395,24 @@ function gridMove(direction) {
     if(direction === 'left') targetId = `${current.r},${current.c-1}`;
     if(direction === 'right') targetId = `${current.r},${current.c+1}`;
 
-    if(targetId && current.connections.includes(targetId)) {
-        let target = regionGrid.nodeMap[targetId];
-        if(target) {
-            regionGridPos = { r: target.r, c: target.c };
+    let target = regionGrid.nodeMap[targetId];
+    if(target) {
+        if(!current.connections.includes(targetId)) {
+            current.connections.push(targetId);
         }
+        if(!target.connections.includes(current.id)) {
+            target.connections.push(current.id);
+        }
+        regionGridPos = { r: target.r, c: target.c };
     }
 
     renderGrid();
     updateGridButtons();
 
-    // 到达新节点自动触发事件
     let cell = getCurrentNode();
     if(cell && !cell.visited) {
         triggerGridEvent();
     } else if(cell) {
-        // 已访问的节点显示回顾信息
         let panel = document.getElementById('grid-event-panel');
         panel.innerHTML = '<p style="color:#64748b;">这里已经探索过了。</p>';
     }

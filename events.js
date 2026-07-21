@@ -995,14 +995,17 @@ function generateRegionGrid(eventPool, bossEvent, regionId) {
         dirs.forEach(d => {
             let nr = node.r + d[0], nc = node.c + d[1];
             let key = `${nr},${nc}`;
-            if(nodeMap[key] && Math.random() < 0.65) {
-                if(!node.connections.includes(key)) node.connections.push(key);
-                if(!nodeMap[key].connections.includes(node.id)) nodeMap[key].connections.push(node.id);
+            if(nodeMap[key]) {
+                let hasConnection = node.connections.includes(key) && nodeMap[key].connections.includes(node.id);
+                if(!hasConnection && Math.random() < 0.65) {
+                    if(!node.connections.includes(key)) node.connections.push(key);
+                    if(!nodeMap[key].connections.includes(node.id)) nodeMap[key].connections.push(node.id);
+                }
             }
         });
     });
 
-    ensureAllConnected(nodes, nodeMap, startNode);
+    ensureAllConnected(nodes, nodeMap, startNode, width, height);
 
     assignEventsToNodes(nodes, eventPool, regionId);
 
@@ -1134,7 +1137,7 @@ function ensureMainPath(startNode, bossNode, nodes, nodeMap, width, height) {
     }
 }
 
-function ensureAllConnected(nodes, nodeMap, startNode) {
+function ensureAllConnected(nodes, nodeMap, startNode, width, height) {
     if(nodes.length === 0) return;
 
     let visited = new Set();
@@ -1221,6 +1224,6 @@ function ensureAllConnected(nodes, nodeMap, startNode) {
 
     let allVisited = nodes.every(n => visited.has(n.id));
     if(!allVisited) {
-        ensureAllConnected(nodes, nodeMap, startNode);
+        ensureAllConnected(nodes, nodeMap, startNode, width, height);
     }
 }
