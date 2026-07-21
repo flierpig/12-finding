@@ -337,7 +337,8 @@ function renderGrid() {
             div.dataset.c = c;
 
             let isCurrent = (r === regionGridPos.r && c === regionGridPos.c);
-            let isConnected = node && getCurrentNode() && getCurrentNode().connections.includes(node.id);
+            let isAdjacent = node && getCurrentNode() && 
+                (Math.abs(r - regionGridPos.r) + Math.abs(c - regionGridPos.c) === 1);
 
             if(!node) {
                 // 空地：不可通行
@@ -358,8 +359,8 @@ function renderGrid() {
                 div.classList.add('visited');
                 div.innerText = node.event ? node.event.icon : '•';
             } else {
-                div.innerText = isConnected ? '•' : '❔';
-                if(isConnected) div.classList.add('reachable');
+                div.innerText = isAdjacent ? '•' : '❔';
+                if(isAdjacent) div.classList.add('reachable');
             }
 
             div.onclick = () => {
@@ -375,10 +376,10 @@ function renderGrid() {
 function updateGridButtons() {
     let current = getCurrentNode();
     if(!current) return;
-    let hasUp = current.connections.includes(`${current.r-1},${current.c}`);
-    let hasDown = current.connections.includes(`${current.r+1},${current.c}`);
-    let hasLeft = current.connections.includes(`${current.r},${current.c-1}`);
-    let hasRight = current.connections.includes(`${current.r},${current.c+1}`);
+    let hasUp = regionGrid.nodeMap[`${current.r-1},${current.c}`];
+    let hasDown = regionGrid.nodeMap[`${current.r+1},${current.c}`];
+    let hasLeft = regionGrid.nodeMap[`${current.r},${current.c-1}`];
+    let hasRight = regionGrid.nodeMap[`${current.r},${current.c+1}`];
     document.getElementById('btn-up').disabled = !hasUp;
     document.getElementById('btn-down').disabled = !hasDown;
     document.getElementById('btn-left').disabled = !hasLeft;
