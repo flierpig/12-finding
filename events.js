@@ -966,7 +966,8 @@ function generateRegionGrid(eventPool, bossEvent, regionId) {
     for(let r = 0; r < height; r++) {
         for(let c = 0; c < width; c++) {
             let isEdge = (r === 0 || c === 0 || r === height-1 || c === width-1);
-            let density = isEdge ? 0.82 : 0.48;
+            let isStartOrBoss = (r === 0 && c === 0) || (r === height-1 && c === width-1);
+            let density = isStartOrBoss ? 1 : (isEdge ? 0.85 : 0.55);
             if(Math.random() < density) {
                 let node = {
                     id: `${r},${c}`, r: r, c: c,
@@ -987,23 +988,22 @@ function generateRegionGrid(eventPool, bossEvent, regionId) {
     bossNode.type = 'boss';
     bossNode.event = bossEvent;
 
-    ensureStartNeighbor(startNode, nodes, nodeMap, width, height);
+    ensureMainPath(startNode, bossNode, nodes, nodeMap, width, height);
 
     let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
     nodes.forEach(node => {
         dirs.forEach(d => {
             let nr = node.r + d[0], nc = node.c + d[1];
             let key = `${nr},${nc}`;
-            if(nodeMap[key] && Math.random() < 0.62) {
+            if(nodeMap[key] && Math.random() < 0.65) {
                 if(!node.connections.includes(key)) node.connections.push(key);
                 if(!nodeMap[key].connections.includes(node.id)) nodeMap[key].connections.push(node.id);
             }
         });
     });
 
-    ensureConnected(nodes, nodeMap, startNode);
+    ensureAllConnected(nodes, nodeMap, startNode);
 
-    // 分配事件：遵循规则
     assignEventsToNodes(nodes, eventPool, regionId);
 
     return {
@@ -1101,13 +1101,46 @@ function createNodeAt(r, c, nodes, nodeMap, width, height) {
     return node;
 }
 
-function ensureConnected(nodes, nodeMap, startNode) {
+function ensureMainPath(startNode, bossNode, nodes, nodeMap, width, height) {
+    let current = startNode;
+    let targetR = bossNode.r;
+    let targetC = bossNode.c;
+
+    while(current.id !== bossNode.id) {
+        let nextR = current.r;
+        let nextC = current.c;
+
+        if(current.r < targetR) nextR++;
+        else if(current.r > targetR) nextR--;
+
+        if(current.c < targetC) nextC++;
+        else if(current.c > targetC) nextC--;
+
+        let nextKey = `${nextR},${nextC}`;
+        let nextNode = nodeMap[nextKey];
+
+        if(!nextNode) {
+            nextNode = createNodeAt(nextR, nextC, nodes, nodeMap, width, height);
+        }
+
+        if(!current.connections.includes(nextNode.id)) {
+            current.connections.push(nextNode.id);
+        }
+        if(!nextNode.connections.includes(current.id)) {
+            nextNode.connections.push(current.id);
+        }
+
+        current = nextNode;
+    }
+}
+
+function ensureAllConnected(nodes, nodeMap, startNode) {
     if(nodes.length === 0) return;
 
-    // 从起点开始做BFS，找到所有可达节点
     let visited = new Set();
     let queue = [startNode.id];
     visited.add(startNode.id);
+
     while(queue.length > 0) {
         let cur = nodeMap[queue.shift()];
         cur.connections.forEach(nextId => {
@@ -1118,92 +1151,76 @@ function ensureConnected(nodes, nodeMap, startNode) {
         });
     }
 
-    // 连接孤立节点到已访问的连通分量
     let isolated = nodes.filter(n => !visited.has(n.id));
     let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
 
     isolated.forEach(node => {
-        let nearest = null;
+        let bestPath = null;
+        let minDist = Infinity;
 
-        // 优先找相邻的已访问节点
         for(let d of dirs) {
             let nr = node.r + d[0], nc = node.c + d[1];
             let key = `${nr},${nc}`;
             if(nodeMap[key] && visited.has(key)) {
-                nearest = nodeMap[key];
+                minDist = 1;
+                bestPath = nodeMap[key];
                 break;
             }
         }
 
-        // 如果没有相邻的已访问节点，找距离最近的已访问节点
-        if(!nearest) {
-            let minDist = Infinity;
+        if(!bestPath) {
             nodes.forEach(other => {
                 if(visited.has(other.id)) {
                     let dist = Math.abs(node.r - other.r) + Math.abs(node.c - other.c);
-                    if(dist < minDist) { minDist = dist; nearest = other; }
+                    if(dist < minDist) {
+                        minDist = dist;
+                        bestPath = other;
+                    }
                 }
             });
         }
 
-        if(nearest) {
-            // 如果相邻，直接连接
-            if(Math.abs(node.r - nearest.r) + Math.abs(node.c - nearest.c) === 1) {
-                if(!node.connections.includes(nearest.id)) node.connections.push(nearest.id);
-                if(!nearest.connections.includes(node.id)) nearest.connections.push(node.id);
+        if(bestPath) {
+            if(Math.abs(node.r - bestPath.r) + Math.abs(node.c - bestPath.c) === 1) {
+                if(!node.connections.includes(bestPath.id)) node.connections.push(bestPath.id);
+                if(!bestPath.connections.includes(node.id)) bestPath.connections.push(node.id);
+                visited.add(node.id);
             } else {
-                // 如果不相邻，沿着最短路径逐步连接（先水平后垂直）
-                let cr = nearest.r, cc = nearest.c;
-                let prev = nearest;
-                // 水平移动
+                let cr = bestPath.r;
+                let cc = bestPath.c;
+                let prev = bestPath;
+
                 while(cc !== node.c) {
                     cc += Math.sign(node.c - cc);
                     let key = `${cr},${cc}`;
-                    if(nodeMap[key]) {
-                        if(!prev.connections.includes(key)) prev.connections.push(key);
-                        if(!nodeMap[key].connections.includes(prev.id)) nodeMap[key].connections.push(prev.id);
-                        visited.add(key);
-                        prev = nodeMap[key];
+                    if(!nodeMap[key]) {
+                        nodeMap[key] = createNodeAt(cr, cc, nodes, nodeMap, width, height);
                     }
+                    if(!prev.connections.includes(key)) prev.connections.push(key);
+                    if(!nodeMap[key].connections.includes(prev.id)) nodeMap[key].connections.push(prev.id);
+                    visited.add(key);
+                    prev = nodeMap[key];
                 }
-                // 垂直移动
+
                 while(cr !== node.r) {
                     cr += Math.sign(node.r - cr);
                     let key = `${cr},${cc}`;
-                    if(nodeMap[key]) {
-                        if(!prev.connections.includes(key)) prev.connections.push(key);
-                        if(!nodeMap[key].connections.includes(prev.id)) nodeMap[key].connections.push(prev.id);
-                        visited.add(key);
-                        prev = nodeMap[key];
+                    if(!nodeMap[key]) {
+                        nodeMap[key] = createNodeAt(cr, cc, nodes, nodeMap, width, height);
                     }
+                    if(!prev.connections.includes(key)) prev.connections.push(key);
+                    if(!nodeMap[key].connections.includes(prev.id)) nodeMap[key].connections.push(prev.id);
+                    visited.add(key);
+                    prev = nodeMap[key];
                 }
+
+                visited.add(node.id);
             }
-            visited.add(node.id);
         }
     });
-}
 
-function ensureStartNeighbor(startNode, nodes, nodeMap, width, height) {
-    let neighbors = [
-        { r: startNode.r - 1, c: startNode.c },
-        { r: startNode.r + 1, c: startNode.c },
-        { r: startNode.r, c: startNode.c - 1 },
-        { r: startNode.r, c: startNode.c + 1 }
-    ].filter(p => p.r >= 0 && p.r < height && p.c >= 0 && p.c < width);
-
-    // 优先使用已存在的邻居节点
-    let existing = neighbors.filter(p => nodeMap[`${p.r},${p.c}`]).map(p => nodeMap[`${p.r},${p.c}`]);
-
-    if(existing.length === 0) {
-        // 起点周围没有任何节点，强制在右侧或下方创建一个
-        let pref = neighbors[Math.floor(Math.random() * neighbors.length)];
-        let newNode = createNodeAt(pref.r, pref.c, nodes, nodeMap, width, height);
-        existing.push(newNode);
+    let allVisited = nodes.every(n => visited.has(n.id));
+    if(!allVisited) {
+        ensureAllConnected(nodes, nodeMap, startNode);
     }
-
-    // 确保起点至少与这些邻居之一连通
-    existing.forEach(n => {
-        if(!startNode.connections.includes(n.id)) startNode.connections.push(n.id);
-        if(!n.connections.includes(startNode.id)) n.connections.push(startNode.id);
-    });
 }
