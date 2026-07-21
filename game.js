@@ -773,6 +773,7 @@ function prepareSnowBoss(mode, scale) {
         isSnowBoss: true,
         bossMode: mode,
         iceShield: 3,
+        maxIceShield: 3,
         freezeBar: 0,
         freezeThreshold: 3,
         frozenTurns: 0,
@@ -792,7 +793,7 @@ function prepareSnowBoss(mode, scale) {
     log(`<span class="log-boss">👑👑👑 [Boss战开始] ${enemy.name} 登场！</span>`);
     if(isDread) log(`<span class="log-boss-warning">⚠️ 威慑领域展开！本场战斗中你无法暴击、无法闪避！但胜利后的奖励将更加丰厚！</span>`);
     if(isTorch) log(`<span class="log-boss">🔥 火把的光芒压制了寒气！${enemy.name} 无法生成冰盾！</span>`);
-    log(`<span class="log-boss">🛡️ 菇菇祭祀拥有 ${enemy.iceShield} 层冰盾，每层减伤20%！</span>`);
+    log(`<span class="log-boss">🛡️ 菇菇祭祀拥有 ${enemy.iceShield} 层冰盾（上限3层），每层减伤20%！每3回合生成一层冰盾！</span>`);
 }
 
 // ==================== 网格系统结束 ====================
@@ -1011,12 +1012,12 @@ function battleTick() {
         }
     }
 
-    // 菇菇祭祀冰盾生成逻辑：每2回合产生一层冰盾（产生时不攻击）
+    // 菇菇祭祀冰盾生成逻辑：每3回合产生一层冰盾（上限3层）
     if(enemy && enemy.isSnowBoss && !enemy.torchUsed) {
         enemy.turnCounter++;
-        if(enemy.turnCounter % 2 === 0) {
-            enemy.iceShield = Math.min(5, enemy.iceShield + 1);
-            log(`<span class="log-boss">🛡️ 菇菇祭祀正在凝聚寒气，生成一层冰盾！当前冰盾：${enemy.iceShield} 层</span>`);
+        if(enemy.turnCounter % 3 === 0 && enemy.iceShield < enemy.maxIceShield) {
+            enemy.iceShield++;
+            log(`<span class="log-boss">🛡️ 菇菇祭祀正在凝聚寒气，生成一层冰盾！当前冰盾：${enemy.iceShield}/${enemy.maxIceShield} 层</span>`);
             turn++; updateBattleUI(); updateTopBar(); checkUltReady();
             battleTimer = setTimeout(battleTick, speedMode === 1 ? 1200 : 600);
             return;
