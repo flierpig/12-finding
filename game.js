@@ -7,7 +7,11 @@ let speedMode = 1;
 let duckJunEncountered = false;
 let duckJunDefeatedThisRound = false;
 let pDodges = 0, pHitsTaken = 0, pCrits = 0, ePoisonTicks = 0;
-let ultUsedThisFloor = false; // 保留：每场战斗/每个节点可放一次终结技
+let ultUsesLeft = 3; // 每个地图可使用3次终结技
+let sosoUltCooldown = 0; // soso5奥义冷却回合
+let erboDamageCount = 0; // 尔波受伤计数
+let erboCurrentRipple = null; // 尔波当前波纹
+let erboUltUnlocked = false; // 尔波奥义是否解锁
 let battleActive = false;
 
 // 大地图事件进度
@@ -144,12 +148,18 @@ function closeWorldMap() { hide('world-map-panel'); }
 // --- 游戏主循环逻辑 ---
 function initGame(playerKey) {
     player = JSON.parse(JSON.stringify(baseCharData[playerKey]));
-    gold = 10; ultUsedThisFloor = false; duckJunEncountered = false;
-    
+    gold = 10; ultUsesLeft = 3; duckJunEncountered = false;
+
     // 抖抖鸡奥义相关初始化
     player.ultActive = false;
     player.ultDodgeBonus = 0;
     player.frozenTurns = 0;
+
+    // 尔波波纹机制初始化
+    erboDamageCount = 0;
+    erboCurrentRipple = null;
+    erboUltUnlocked = false;
+    player.woodShield = false;
 
     // 初始化镇镇之力
     let zzPool = ['luck', 'crit', 'immortal', 'overload', 'random'];
@@ -201,7 +211,7 @@ function enterNode(nodeId) {
     if(!visitedNodes.includes(nodeId)) visitedNodes.push(nodeId);
 
     // 每个新节点重置一次性能力
-    ultUsedThisFloor = false; zhenZhenUsedThisFloor = false;
+    zhenZhenUsedThisFloor = false;
 
     // 区域地图：进入网格模式（冰原/海岸/丛林）
     if(nodeId === 'snow_start' || nodeId === 'coast_start' || nodeId === 'jungle_start') {
@@ -223,7 +233,13 @@ function enterNode(nodeId) {
     // 终结技状态提示
     let ultStatus = document.createElement('p');
     ultStatus.className = 'ult-status-text';
-    ultStatus.innerText = ultUsedThisFloor ? "⚠️ 终结技本节点已耗尽" : "✨ 终结技：准备就绪";
+    if(player.id === 'erbo') {
+        if(!erboUltUnlocked) ultStatus.innerText = "🌊 波纹奥义：需要暴击解锁";
+        else if(erboCurrentRipple) ultStatus.innerText = `🌊 波纹奥义：${erboCurrentRipple.icon}${erboCurrentRipple.name} 就绪`;
+        else ultStatus.innerText = "🌊 波纹奥义：无波纹可用（受三次伤害收集）";
+    } else {
+        ultStatus.innerText = ultUsesLeft <= 0 ? "⚠️ 终结技本图已耗尽" : `✨ 终结技：剩余 ${ultUsesLeft} 次`;
+    }
     ultStatus.style.marginBottom = '15px';
     optionsDiv.appendChild(ultStatus);
 
@@ -282,6 +298,8 @@ function enterRegionMap(nodeId) {
     if(!meta) { console.error('未知区域节点:', nodeId); return; }
 
     currentRegion = meta.region;
+    ultUsesLeft = 3;
+    sosoUltCooldown = 0;
     regionGrid = generateRegionGrid(meta.eventPool, meta.bossEvent, meta.region);
     regionGridPos = { r: 0, c: 0 };
     regionGridInEvent = false;
@@ -474,9 +492,9 @@ function resolveSnowEventOption(result) {
         if(result.type === 'combat_random') {
             // 根据当前区域随机选择小怪
             let pools = {
-                snow: ['ice_block', 'cold_jun', 'gugugaga'],
-                coast: ['crab', 'seagull'],
-                jungle: ['snake', 'monkey']
+                snow: ['ice_block', 'cold_jun', 'gugugaga', 'frost_wolf', 'ice_imp'],
+                coast: ['crab', 'seagull', 'sea_serpent', 'sand_worm'],
+                jungle: ['snake', 'monkey', 'frog', 'mantis']
             };
             let pool = pools[currentRegion] || pools.snow;
             mobId = pool[Math.floor(Math.random() * pool.length)];
@@ -825,6 +843,8 @@ function startCombat() {
 
     turn = 1; battleActive = true;
     pDodges = 0; pHitsTaken = 0; pCrits = 0; ePoisonTicks = 0;
+    erboDamageCount = 0;
+    enemy.burn = 0; enemy.atkDebuffTurns = 0; enemy.currentAtkDebuff = 0;
     player.poison = 0; enemy.poison = 0; player.pigHealed = false; 
     player.activeDodgeDance = false; player.activeCritDance = false;
     player.frozenTurns = 0;
@@ -914,14 +934,23 @@ function endCombatCleanup() {
         overloadZhenZhenActive = false;
     }
     luckZhenZhenActive = false; critZhenZhenActive = false; immortalZhenZhenActive = false;
+    player.ultActive = false;
+    player.ultDodgeBonus = 0;
+    player.woodShield = false;
+    if(enemy) {
+        enemy.burn = 0;
+        enemy.atkDebuffTurns = 0;
+        enemy.currentAtkDebuff = 0;
+    }
 }
 
 // --- 战斗逻辑 ---
 function triggerSosoDance(char) {
     let r = Math.random(); let danceText = ""; let effects = [];
+    let p = (1 - 0.05) / 3;
     if(r < 0.05) { effects = ['dodge', 'crit', 'heal']; danceText = "🌟SOSO5终极综合舞🌟"; }
-    else if(r < 0.366) { effects = ['dodge']; danceText = "💨闪避舞"; }
-    else if(r < 0.683) { effects = ['crit']; danceText = "💥暴击舞"; }
+    else if(r < 0.05 + p) { effects = ['dodge']; danceText = "💨闪避舞"; }
+    else if(r < 0.05 + p * 2) { effects = ['crit']; danceText = "💥暴击舞"; }
     else { effects = ['heal']; danceText = "❤️回血舞"; }
 
     log(`<span class="log-collab-soso">🕺 [soso5王联动] ${char.name} 触发了 ${danceText}！</span>`);
@@ -932,6 +961,20 @@ function triggerSosoDance(char) {
 
 function battleTick() {
     if(!battleActive) return;
+
+    // 火波纹灼烧：敌人每回合扣血
+    if(enemy && enemy.burn && enemy.burn > 0) {
+        enemy.hp -= enemy.burn;
+        log(`<span class="log-dmg">🔥 [火波灼烧] 敌人被灼烧，扣除 ${enemy.burn} 生命！</span>`);
+    }
+
+    // 土波纹降攻效果：敌人攻击力降低
+    if(enemy && enemy.atkDebuffTurns > 0) {
+        enemy.atkDebuffTurns--;
+        if(enemy.atkDebuffTurns === 0) {
+            log(`<span class="log-skill">🪨 土波压制效果结束，敌人攻击力恢复！</span>`);
+        }
+    }
 
     // 冻结条处理：玩家被冻结则跳过本回合
     if(player.frozenTurns > 0) {
@@ -1015,7 +1058,9 @@ function battleTick() {
     if(player.id === 'soso5' && turn % sosoDanceInterval === 0) triggerSosoDance(player);
     if(enemy.id === 'soso5' && turn % 3 === 0) triggerSosoDance(enemy);
 
-    turn++; updateBattleUI(); updateTopBar(); checkUltReady();
+    turn++;
+    if(player.id === 'soso5' && sosoUltCooldown > 0) sosoUltCooldown--;
+    updateBattleUI(); updateTopBar(); checkUltReady();
     if(player.hp > 0 && enemy.hp > 0) battleTimer = setTimeout(battleTick, speedMode === 1 ? 1200 : 600);
 }
 
@@ -1024,8 +1069,9 @@ function processAction(atkChar, defChar) {
 
     if(atkChar.id === 'zhouge') {
         let ultActive = isPlayerAtk ? zhougeUltActive : false;
-        let target = (ultActive || Math.random() < 0.5) ? defChar : atkChar;
-        let dmg = Math.floor(target.maxHp * 0.1);
+        let isSelfTarget = !ultActive && Math.random() < 0.3;
+        let target = isSelfTarget ? atkChar : defChar;
+        let dmg = Math.floor(target.maxHp * 0.05);
         log(`<span class="log-collab-ff">🍔 [快餐侠联动] 强制扣除 ${target.name} ${dmg}点生命！</span>`);
         if(target === atkChar) {
             if(isPlayerAtk) zhougeSelfDmgStreak++;
@@ -1040,7 +1086,12 @@ function processAction(atkChar, defChar) {
     if(atkChar.id === 'pig' && atkChar.hp < atkChar.maxHp * 0.3 && !atkChar.pigHealed) { let heal = Math.floor(atkChar.maxHp * 0.5); atkChar.hp += heal; atkChar.pigHealed = true; checkUltReady(); }
     if(atkChar.id === 'final' && turn % 4 === 0) { atkChar.hp += 150; }
 
-    let damage = atkChar.atk; let attackTimes = 1;
+    let damage = atkChar.atk;
+    // 土波纹降攻：敌人攻击力降低
+    if(!isPlayerAtk && enemy.currentAtkDebuff) {
+        damage = Math.max(1, damage - enemy.currentAtkDebuff);
+    }
+    let attackTimes = 1;
     if(atkChar.id === 'monkey') {
         if(luckZhenZhenActive) { damage = isPlayerAtk ? Math.floor(damage * 2.5) : 1; } 
         else { damage = Math.floor(Math.random() * (damage * 2.5)) + 1; }
@@ -1092,6 +1143,12 @@ function processAction(atkChar, defChar) {
         if(isCrit && damage > 0) { damage = Math.floor(damage * 1.5); log(`<span class="log-dmg">💥 暴击！</span>`); if(isPlayerAtk) pCrits++; }
     }
 
+    // 尔波奥义解锁：玩家暴击后解锁
+    if(isPlayerAtk && isCrit && player.id === 'erbo' && !erboUltUnlocked) {
+        erboUltUnlocked = true;
+        log(`<span class="log-ult">🌊 [尔波奥义] 暴击觉醒！奥义已解锁！</span>`);
+    }
+
     // 闪避判定
     let isHit = true;
     if (isDreadBattle && defChar.id === player.id) {
@@ -1114,6 +1171,15 @@ function processAction(atkChar, defChar) {
 
     for(let i=0; i<attackTimes; i++) {
         if(isHit && damage > 0) {
+            // 木波纹护盾：免疫伤害并反伤
+            if(!isPlayerAtk && player.woodShield) {
+                player.woodShield = false;
+                let reflect = Math.floor(damage * 0.1);
+                atkChar.hp -= reflect;
+                log(`<span class="log-skill">🌿 [木波护盾] 免疫伤害！反伤 ${reflect}！</span>`);
+                damage = 0;
+            }
+
             // 冰盾减伤
             if(defChar.isSnowBoss && defChar.iceShield > 0) {
                 let reducePct = defChar.iceShield * 0.2;
@@ -1123,6 +1189,15 @@ function processAction(atkChar, defChar) {
             }
 
             defChar.hp -= damage; if(!isPlayerAtk) pHitsTaken++; log(`${atkChar.name} 造成 <span class="log-dmg">${damage}</span> 伤害！`);
+
+            // 尔波波纹收集：玩家受伤害时计数
+            if(!isPlayerAtk && player.id === 'erbo' && !erboCurrentRipple) {
+                erboDamageCount++;
+                log(`<span class="log-skill">🌊 [尔波] 波纹能量 +1（${erboDamageCount}/3）</span>`);
+                if(erboDamageCount >= 3) {
+                    collectRipple();
+                }
+            }
             let lifestealPct = atkChar.lifesteal || 0; if(atkChar.id === 'final') lifestealPct += 30;
             if(lifestealPct > 0) { let heal = Math.floor(damage * lifestealPct / 100); atkChar.hp = Math.min(atkChar.maxHp, atkChar.hp + heal); }
             if(atkChar.id === 'snake') defChar.poison += Math.floor(atkChar.atk * 0.4);
@@ -1207,6 +1282,75 @@ function processAction(atkChar, defChar) {
     return true;
 }
 
+// --- 尔波波纹系统 ---
+const rippleTypes = [
+    { id: 'erbo', name: '尔波纹', icon: '🌊', desc: '连续进行十次攻击' },
+    { id: 'water', name: '水波纹', icon: '💧', desc: '吸取对方10%生命' },
+    { id: 'fire', name: '火波纹', icon: '🔥', desc: '灼烧对方，每回合扣5%血量' },
+    { id: 'wood', name: '木波纹', icon: '🌿', desc: '免疫下一次伤害，反伤10%' },
+    { id: 'gold', name: '金波纹', icon: '✨', desc: '攻击力永久+5' },
+    { id: 'earth', name: '土波纹', icon: '🪨', desc: '对方攻击力下降20%两回合' }
+];
+
+function collectRipple() {
+    let ripple = rippleTypes[Math.floor(Math.random() * rippleTypes.length)];
+    erboCurrentRipple = ripple;
+    erboDamageCount = 0;
+    log(`<span class="log-ult">🌊 [尔波] 波纹共鸣！获得 <b>${ripple.icon} ${ripple.name}</b>！效果：${ripple.desc}</span>`);
+    checkUltReady();
+}
+
+function useErboRipple() {
+    if(!erboCurrentRipple) return;
+
+    let ripple = erboCurrentRipple;
+    log(`<span class="log-ult">🌊 [尔波奥义] 释放 ${ripple.icon} ${ripple.name}！</span>`);
+
+    switch(ripple.id) {
+        case 'erbo':
+            // 连续十次攻击
+            for(let i = 0; i < 10; i++) {
+                let dmg = player.atk;
+                enemy.hp -= dmg;
+                log(`<span class="log-dmg">🌊 波纹连击 ${i+1}/10！造成 ${dmg} 伤害！</span>`);
+            }
+            break;
+        case 'water':
+            // 吸取10%生命
+            let drain = Math.floor(enemy.maxHp * 0.1);
+            enemy.hp -= drain;
+            player.hp = Math.min(player.maxHp, player.hp + drain);
+            log(`<span class="log-heal">💧 水波吸取！造成 ${drain} 伤害，回复 ${drain} 生命！</span>`);
+            break;
+        case 'fire':
+            // 灼烧状态：每回合扣5%血
+            enemy.burn = Math.floor(enemy.maxHp * 0.05);
+            log(`<span class="log-dmg">🔥 火波灼烧！对方进入灼烧状态，每回合扣 ${enemy.burn} 血！</span>`);
+            break;
+        case 'wood':
+            // 免疫下一次伤害并反伤
+            player.woodShield = true;
+            log(`<span class="log-skill">🌿 木波护盾！下次伤害免疫并反伤10%！</span>`);
+            break;
+        case 'gold':
+            // 攻击力永久+5
+            player.atk += 5;
+            player.maxAtkBonus = (player.maxAtkBonus || 0) + 5;
+            log(`<span class="log-ult">✨ 金波加持！攻击力永久+5！（当前攻击 ${player.atk}）</span>`);
+            break;
+        case 'earth':
+            // 对方攻击力下降20%两回合
+            enemy.atkDebuffTurns = 2;
+            let debuff = Math.floor(enemy.atk * 0.2);
+            enemy.currentAtkDebuff = debuff;
+            log(`<span class="log-skill">🪨 土波压制！对方攻击力下降20%两回合！</span>`);
+            break;
+    }
+
+    erboCurrentRipple = null;
+    checkUltReady();
+}
+
 function checkDoudoujiUlt() {
     // 抖抖鸡奥义：通过成功额外闪避触发被动加成
     if(player.id === 'doudouji' && !player.ultActive && battleActive) {
@@ -1220,33 +1364,88 @@ function checkDoudoujiUlt() {
 }
 
 function checkUltReady() {
-    if(!battleActive || ultUsedThisFloor) return;
+    if(!battleActive) return;
     let ready = false; let c = player.id;
-    if(c === 'soso5') ready = true; 
-    if(c === 'zhouge' && zhougeSelfDmgStreak >= 3) ready = true;
-    if(c === 'doudouji' && player.ultActive) ready = true;
+    let cooldown = "";
+    let rippleText = erboCurrentRipple ? ` (${erboCurrentRipple.icon}${erboCurrentRipple.name})` : "";
+
+    if(c === 'erbo') {
+        // 尔波：暴击解锁，有波纹就能用，无次数限制
+        if(erboUltUnlocked && erboCurrentRipple) ready = true;
+    } else if(ultUsesLeft > 0) {
+        if(c === 'soso5') {
+            if(sosoUltCooldown <= 0) ready = true;
+            else cooldown = ` (冷却 ${sosoUltCooldown} 回合)`;
+        }
+        if(c === 'zhouge' && zhougeSelfDmgStreak >= 1) ready = true;
+        if(c === 'doudouji' && player.ultActive) ready = true;
+    }
 
     let btn = document.getElementById('ult-btn');
-    if(ready) { btn.className = 'ready'; btn.disabled = false; btn.innerText = "🔥 释放终结技 🔥"; } 
-    else { btn.className = ''; btn.disabled = true; btn.innerText = "终结技：条件未达成"; }
+    if(ready) {
+        btn.className = 'ready'; btn.disabled = false;
+        if(c === 'erbo') btn.innerText = `🌊 释放波纹奥义${rippleText}`;
+        else btn.innerText = `🔥 释放终结技 (剩余 ${ultUsesLeft} 次) 🔥`;
+    } else {
+        btn.className = ''; btn.disabled = true;
+        if(c === 'erbo') {
+            if(!erboUltUnlocked) btn.innerText = "终结技：需要暴击解锁";
+            else if(!erboCurrentRipple) btn.innerText = "终结技：无波纹可用";
+            else btn.innerText = "终结技：条件未达成";
+        } else {
+            btn.innerText = `终结技：条件未达成${cooldown}`;
+        }
+    }
 }
 
 function castUltimate() {
-    if(ultUsedThisFloor || !battleActive) return;
-    ultUsedThisFloor = true;
-    let btn = document.getElementById('ult-btn');
-    btn.className = ''; btn.disabled = true; btn.innerText = "终结技本层已耗尽";
-    log(`<span class="log-ult">🌟 ${player.name} 释放了终结技！🌟</span>`);
+    if(!battleActive) return;
+
     let c = player.id;
-    
-    if(c === 'soso5') {
-        if(player.hp > enemy.hp) { let diff = player.hp - enemy.hp; enemy.hp -= diff; } 
-        else if(player.hp < enemy.hp) { let diff = enemy.hp - player.hp; player.hp = Math.min(player.maxHp, player.hp + diff); triggerSosoDance(player); } 
+
+    // 尔波单独处理：无次数限制
+    if(c === 'erbo') {
+        if(!erboUltUnlocked || !erboCurrentRipple) return;
+        useErboRipple();
+        if(hasSosoUltItem) { log(`<span class="log-collab-soso">💿 [联动道具] 奥义附带尬舞！</span>`); triggerSosoDance(player); }
+        updateBattleUI(); updateTopBar(); checkDeath();
+        return;
     }
-    else if(c === 'zhouge') { player.hp = player.maxHp; zhougeUltActive = true; }
-    else if(c === 'doudouji') { 
-        // 抖抖鸡奥义释放：立即进行5次额外闪避判定，每次成功造成一次伤害
-        player.ultDodgeBonus += 10;
+
+    // 其他角色：需要次数限制
+    if(ultUsesLeft <= 0) return;
+    if(c === 'soso5' && sosoUltCooldown > 0) return;
+
+    ultUsesLeft--;
+    let btn = document.getElementById('ult-btn');
+    btn.className = ''; btn.disabled = true;
+
+    if(ultUsesLeft > 0) btn.innerText = `终结技：剩余 ${ultUsesLeft} 次`;
+    else btn.innerText = "终结技本图已耗尽";
+
+    log(`<span class="log-ult">🌟 ${player.name} 释放了终结技！🌟</span>`);
+
+    if(c === 'soso5') {
+        sosoUltCooldown = 2;
+        if(player.hp > enemy.hp) {
+            let diff = player.hp - enemy.hp;
+            enemy.hp -= diff;
+            log(`<span class="log-ult">💥 血差伤害！造成 ${diff} 点真实伤害！</span>`);
+        } else if(player.hp < enemy.hp) {
+            let diff = enemy.hp - player.hp;
+            player.hp = Math.min(player.maxHp, player.hp + diff);
+            log(`<span class="log-heal">💚 血差回复！恢复 ${diff} 点生命！</span>`);
+            triggerSosoDance(player);
+        }
+    }
+    else if(c === 'zhouge') {
+        player.hp = player.maxHp;
+        zhougeUltActive = true;
+        zhougeSelfDmgStreak = 0;
+        log(`<span class="log-heal">💚 回血全满！天赋转为只扣敌方血量！</span>`);
+    }
+    else if(c === 'doudouji') {
+        log(`<span class="log-ult">🐔 [抖抖鸡奥义] 极限闪避爆发！立即进行5次闪避判定！</span>`);
         for(let i=0; i<5; i++) {
             let dodgeRoll = Math.random() * 100;
             let totalDodge = player.dodge + player.ultDodgeBonus;
@@ -1260,7 +1459,6 @@ function castUltimate() {
                 log(`<span class="log-ult">🐔 [抖抖鸡奥义] 闪避失败，额外闪避率+5%！</span>`);
             }
         }
-        ultUsedThisFloor = true;
     }
     
     if(hasSosoUltItem) { log(`<span class="log-collab-soso">💿 [联动道具] 奥义附带尬舞！</span>`); triggerSosoDance(player); }
@@ -1571,7 +1769,7 @@ function nextFloor() {
         window._shopNextNode = null;
     } else {
         // 兼容旧调用/兜底
-        ultUsedThisFloor = false; zhenZhenUsedThisFloor = false;
+        zhenZhenUsedThisFloor = false;
         prepareEncounter();
     }
 }

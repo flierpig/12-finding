@@ -361,6 +361,88 @@ const snowEvents = [
         options: [
             { text: '迎战', result: { type: 'combat_random' } }
         ]
+    },
+    {
+        id: 'se_frost_wolf_pack',
+        name: '狼群出没',
+        icon: '🐺',
+        desc: '一声狼嚎划破夜空，几只霜狼从雪坡上跃下，将你团团围住！',
+        type: 'event',
+        options: [
+            { text: '拔剑迎战', result: { type: 'combat', mobId: 'frost_wolf' } },
+            { text: '点火驱赶', result: { type: 'move' } },
+            { text: '分散逃跑', result: { type: 'heal', amount: -10, text: '逃跑时被抓伤，损失10生命' } }
+        ]
+    },
+    {
+        id: 'se_ice_imp_rush',
+        name: '冰魔突袭',
+        icon: '👿',
+        desc: '几个矮小的冰魔从冰缝中窜出，挥舞着冰锥向你冲来！',
+        type: 'event',
+        options: [
+            { text: '迎战', result: { type: 'combat', mobId: 'ice_imp' } },
+            { text: '冰冻它们', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'se_snow_titan_awakening',
+        name: '雪巨人苏醒',
+        icon: '👹',
+        desc: '远处的雪山突然震动，一个由积雪凝聚的巨人缓缓站起，目光锁定了你！',
+        type: 'event',
+        options: [
+            { text: '挑战巨人', result: { type: 'combat', mobId: 'snow_titan' } },
+            { text: '绕道而行', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'se_frozen_lake',
+        name: '冰封湖面',
+        icon: '💧',
+        desc: '一片结冰的湖面延伸向远方，冰层下似乎有什么东西在游动。',
+        type: 'event',
+        options: [
+            { text: '踏上冰面', result: { type: 'heal', amount: -20, text: '冰面碎裂，你掉入冰水中，损失20生命' } },
+            { text: '绕湖而行', result: { type: 'move' } },
+            { text: '观察冰层', result: { type: 'gold', amount: 15 } }
+        ]
+    },
+    {
+        id: 'se_aurora_blessing',
+        name: '极光祝福',
+        icon: '🌌',
+        desc: '绚丽的极光在夜空中舞动，散发着神秘的能量。',
+        type: 'event',
+        options: [
+            { text: '沐浴极光', result: { type: 'heal', amount: 0.2, text: '极光治愈了你，恢复20%生命' } },
+            { text: '祈祷', result: { type: 'gold', amount: 10 } },
+            { text: '继续前进', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'se_ice_cave',
+        name: '冰洞探险',
+        icon: '🕳️',
+        desc: '一处隐藏在冰川后的冰洞，里面闪烁着奇异的光芒。',
+        type: 'event',
+        options: [
+            { text: '进入探索', result: { type: 'gold', amount: 30 } },
+            { text: '小心观察', result: { type: 'heal', amount: 0.1, text: '发现冰晶，恢复10%生命' } },
+            { text: '离开', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'se_snowman_alive',
+        name: '活雪人',
+        icon: '⛄',
+        desc: '一个巨大的雪人突然睁开了眼睛，它的身上插着一把生锈的剑。',
+        type: 'event',
+        options: [
+            { text: '拔出宝剑', result: { type: 'gold', amount: 25 } },
+            { text: '逃跑', result: { type: 'move' } },
+            { text: '和它说话', result: { type: 'heal', amount: 0.15, text: '雪人送给你一颗温暖的冰晶，恢复15%生命' } }
+        ]
     }
 ];
 
@@ -526,6 +608,87 @@ const coastEvents = [
         options: [
             { text: '迎战', result: { type: 'combat_random' } }
         ]
+    },
+    {
+        id: 'ce_sea_serpent',
+        name: '海蛇出没',
+        icon: '🐉',
+        desc: '一条剧毒的海蛇从礁石缝中钻出，吐着信子向你袭来！',
+        type: 'event',
+        options: [
+            { text: '迎战', result: { type: 'combat', mobId: 'sea_serpent' } },
+            { text: '撒盐驱赶', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_sand_worm_burst',
+        name: '沙虫突袭',
+        icon: '🐛',
+        desc: '脚下的沙地突然隆起，一只巨型沙虫破土而出！',
+        type: 'event',
+        options: [
+            { text: '迎战', result: { type: 'combat', mobId: 'sand_worm' } },
+            { text: '快速后退', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_ghost_ship',
+        name: '幽灵船现身',
+        icon: '👻',
+        desc: '迷雾中一艘幽灵船缓缓驶来，船上空无一人却灯火通明！',
+        type: 'event',
+        options: [
+            { text: '登船探索', result: { type: 'combat', mobId: 'ship_ghost' } },
+            { text: '远远避开', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_treasure_map',
+        name: '藏宝图',
+        icon: '🗺️',
+        desc: '沙滩上捡到一张破旧的藏宝图，上面标记着一个神秘的地点。',
+        type: 'event',
+        options: [
+            { text: '前往寻宝', result: { type: 'gold', amount: 40 } },
+            { text: '卖给商人', result: { type: 'gold', amount: 20 } },
+            { text: '扔掉', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_dolphin_friend',
+        name: '海豚引路',
+        icon: '🐬',
+        desc: '一只海豚跃出水面，似乎在向你示意方向。',
+        type: 'event',
+        options: [
+            { text: '跟随它', result: { type: 'gold', amount: 25 } },
+            { text: '挥手告别', result: { type: 'move' } },
+            { text: '下水游泳', result: { type: 'heal', amount: 0.1, text: '海豚带你找到了温泉，恢复10%生命' } }
+        ]
+    },
+    {
+        id: 'ce_storm_warning',
+        name: '风暴预警',
+        icon: '⛈️',
+        desc: '天空突然乌云密布，海风变得狂暴，一场风暴即将来临！',
+        type: 'event',
+        options: [
+            { text: '寻找避风港', result: { type: 'gold', amount: 15 } },
+            { text: '抓紧赶路', result: { type: 'heal', amount: -15, text: '被暴风雨淋湿，损失15生命' } },
+            { text: '等待风暴过去', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_underwater_cave',
+        name: '水下洞穴',
+        icon: '🕳️',
+        desc: '潮间带露出一个神秘的水下洞穴入口。',
+        type: 'event',
+        options: [
+            { text: '潜入探索', result: { type: 'gold', amount: 35 } },
+            { text: '在洞口观察', result: { type: 'heal', amount: 0.15, text: '发现珍珠，恢复15%生命' } },
+            { text: '离开', result: { type: 'move' } }
+        ]
     }
 ];
 
@@ -680,6 +843,99 @@ const jungleEvents = [
         type: 'combat_random',
         options: [
             { text: '迎战', result: { type: 'combat_random' } }
+        ]
+    },
+    {
+        id: 'je_frog_poison',
+        name: '毒蛙群',
+        icon: '🐸',
+        desc: '一群色彩鲜艳的毒蛙在草丛中跳跃，它们的皮肤散发着剧毒！',
+        type: 'event',
+        options: [
+            { text: '迎战', result: { type: 'combat', mobId: 'frog' } },
+            { text: '绕道而行', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_mantis_ambush',
+        name: '螳螂伏击',
+        icon: '🦗',
+        desc: '一只巨型螳螂从树上跃下，锋利的镰刀臂闪着寒光！',
+        type: 'event',
+        options: [
+            { text: '迎战', result: { type: 'combat', mobId: 'mantis' } },
+            { text: '后退躲避', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_tiger_king',
+        name: '虎王降临',
+        icon: '🐅',
+        desc: '一声震天虎啸，丛林虎王从树冠上跃下，它的眼神充满威严！',
+        type: 'event',
+        options: [
+            { text: '挑战虎王', result: { type: 'combat', mobId: 'jungle_tiger' } },
+            { text: '匍匐后退', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_vine_trap',
+        name: '藤蔓陷阱',
+        icon: '🌿',
+        desc: '地面突然冒出藤蔓，试图缠住你的脚踝！',
+        type: 'event',
+        options: [
+            { text: '挣脱', result: { type: 'heal', amount: -12, text: '强行挣脱，损失12生命' } },
+            { text: '小心解开', result: { type: 'move' } },
+            { text: '砍断藤蔓', result: { type: 'gold', amount: 10 } }
+        ]
+    },
+    {
+        id: 'je_butterfly_guide',
+        name: '蝴蝶引路',
+        icon: '🦋',
+        desc: '一只发光的蝴蝶在前方飞舞，似乎在引导你前往某个地方。',
+        type: 'event',
+        options: [
+            { text: '跟随蝴蝶', result: { type: 'gold', amount: 25 } },
+            { text: '欣赏美景', result: { type: 'heal', amount: 0.1, text: '放松心情，恢复10%生命' } },
+            { text: '继续前进', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_ancient_temple',
+        name: '远古神庙',
+        icon: '🏛️',
+        desc: '一座被藤蔓覆盖的远古神庙，门口立着残破的石柱。',
+        type: 'event',
+        options: [
+            { text: '进入探索', result: { type: 'gold', amount: 35 } },
+            { text: '祭拜神像', result: { type: 'heal', amount: 0.2, text: '获得祝福，恢复20%生命' } },
+            { text: '离开', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_termite_mound',
+        name: '白蚁巢穴',
+        icon: '🐜',
+        desc: '一座巨大的白蚁巢穴，里面似乎有什么发光的东西。',
+        type: 'event',
+        options: [
+            { text: '挖掘', result: { type: 'gold', amount: 20 } },
+            { text: '观察', result: { type: 'heal', amount: -8, text: '被白蚁咬伤，损失8生命' } },
+            { text: '离开', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_rainbow_fruit',
+        name: '彩虹果实',
+        icon: '🍎',
+        desc: '一棵挂满彩虹色果实的果树，果实散发着诱人的香气。',
+        type: 'event',
+        options: [
+            { text: '采摘果实', result: { type: 'heal', amount: 0.25, text: '果实非常美味，恢复25%生命' } },
+            { text: '带走种子', result: { type: 'gold', amount: 15 } },
+            { text: '不碰未知植物', result: { type: 'move' } }
         ]
     }
 ];
