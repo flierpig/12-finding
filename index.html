@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>12俊俊寻宝记 x 联动扩展版</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 系统导航 -->
+    <div class="sys-nav">
+        <button class="sys-btn" onclick="openPokedex()">📖 官方图鉴</button>
+        <button class="sys-btn" onclick="openInventory()">🎒 我的背包</button>
+        <button class="sys-btn" onclick="openWorldMap()">🗺️ 世界地图</button>
+    </div>
+
+    <h1 id="main-title">🗡️ 寻宝之旅 🛡️</h1>
+    <div id="sub-title" class="subtitle">冰原 · 海岸 · 丛林 · 12俊俊 x 联动扩展版</div>
+
+    <!-- 顶部状态栏 -->
+    <div id="top-bar" class="hidden">
+        <div class="top-bar-row">
+            <span class="top-bar-location">📍 <span id="ui-location">起始之地</span></span>
+            <span class="top-bar-bosses">👑 已击败Boss: <span id="ui-bosses">0/3</span></span>
+        </div>
+        <div class="top-bar-stats">
+            <div class="stat-item hp"><span class="stat-label">HP</span><span id="ui-hp">100/100</span></div>
+            <div class="stat-item atk"><span class="stat-label">ATK</span><span id="ui-atk">10</span></div>
+            <div class="stat-item spd"><span class="stat-label">SPD</span><span id="ui-spd">10</span></div>
+            <div class="stat-item crit"><span class="stat-label">CRT</span><span id="ui-crit">0</span>%</div>
+            <div class="stat-item life"><span class="stat-label">LST</span><span id="ui-life">0</span>%</div>
+            <div class="stat-item dodge"><span class="stat-label">DOD</span><span id="ui-dodge">0</span>%</div>
+            <div class="stat-gold"><span class="stat-label">🪙</span><span id="ui-gold">0</span></div>
+        </div>
+    </div>
+
+    <!-- 选人界面 -->
+    <div id="selection-screen" class="screen">
+        <h2 class="title-text">挑选你的寻宝人</h2>
+        <div class="grid" id="char-grid"></div>
+    </div>
+
+    <!-- 事件节点界面 -->
+    <div id="event-screen" class="screen hidden">
+        <div style="font-size:48px; margin-bottom:10px;" id="event-icon">🌅</div>
+        <h2 id="event-title">事件标题</h2>
+        <p id="event-desc" class="desc-text">事件描述...</p>
+        <div id="event-options" class="choice-container" style="flex-direction:column; align-items:stretch;"></div>
+        <button class="action-btn hidden" id="event-combat-btn" onclick="startCombat()">进入战斗</button>
+    </div>
+
+    <!-- 网格地图界面 -->
+    <div id="grid-map-screen" class="screen hidden">
+        <h2 class="title-text" id="grid-map-title">❄️ 永冻雪地</h2>
+        <p id="grid-map-subtitle" style="color:#94a3b8; font-size:14px; margin-bottom:15px;">当前位置：<span id="grid-pos-text">0,0</span></p>
+        <div id="grid-container" style="display:grid; gap:9px; justify-content:center; margin-bottom:20px;"></div>
+        <div id="grid-event-panel" style="background:rgba(0,0,0,0.4); border-radius:12px; padding:15px; border:1px solid var(--border); min-height:80px;">
+            <p style="color:#94a3b8; margin:0;">选择一个方向移动，或点击当前格子触发事件。</p>
+        </div>
+        <div style="display:flex; justify-content:center; gap:10px; margin-top:15px; flex-wrap:wrap;">
+            <button class="sys-btn" onclick="gridMove('up')" id="btn-up">⬆️ 上</button>
+            <button class="sys-btn" onclick="gridMove('down')" id="btn-down">⬇️ 下</button>
+            <button class="sys-btn" onclick="gridMove('left')" id="btn-left">⬅️ 左</button>
+            <button class="sys-btn" onclick="gridMove('right')" id="btn-right">➡️ 右</button>
+        </div>
+        <button class="action-btn" style="margin-top:15px;" onclick="openWorldMap()">🗺️ 查看世界地图</button>
+    </div>
+
+    <!-- 大地图面板（可展开查看当前世界） -->
+    <div id="world-map-panel" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeWorldMap()">×</button>
+            <h2 class="title-text" style="margin-top:0;">🗺️ 当前世界</h2>
+            <div id="world-map-viz" style="display:flex; justify-content:space-around; flex-wrap:wrap; gap:15px; margin-top:15px;"></div>
+        </div>
+    </div>
+
+    <!-- 战斗界面 -->
+    <div id="battle-screen" class="screen hidden">
+        <div class="battle-bg"></div>
+        <div class="arena-header">
+            <span class="battle-title">⚔️ 寻宝激战中...</span>
+            <button id="speed-btn" onclick="toggleSpeed()">⏩ 1倍速</button>
+        </div>
+        <div class="arena">
+            <div class="fighter player-card" id="player-box">
+                <div class="char-icon" id="p-icon"></div>
+                <div id="p-name" class="char-name">玩家</div>
+                <div class="hp-bar-bg"><div class="hp-bar-fill player-hp" id="p-hp-bar"></div></div>
+                <div id="p-hp-text" class="hp-text">100/100</div>
+                <div class="fighter-stats" id="p-stats"></div>
+                <div class="status-effects" id="p-effects"></div>
+            </div>
+            <div class="vs">
+                <div class="vs-text">VS</div>
+                <div class="turn-counter" id="turn-counter">第 1 回合</div>
+            </div>
+            <div class="fighter enemy-card" id="enemy-box">
+                <div class="char-icon" id="e-icon"></div>
+                <div id="e-name" class="char-name">敌人</div>
+                <div class="hp-bar-bg"><div class="hp-bar-fill enemy-hp" id="e-hp-bar"></div></div>
+                <div id="e-hp-text" class="hp-text">100/100</div>
+                <div class="fighter-stats" id="e-stats"></div>
+                <div class="status-effects" id="e-effects"></div>
+            </div>
+        </div>
+
+        <!-- 技能按钮区 -->
+        <div class="skill-bar">
+            <button id="ult-btn" onclick="castUltimate()" disabled>终结技：未就绪</button>
+            <button id="zhen-btn" onclick="castZhenZhen()" disabled>❓ 镇镇之力 (未解锁)</button>
+        </div>
+
+        <div id="log-box"></div>
+        <button class="action-btn hidden" id="battle-end-btn" onclick="endCombat()">继续寻宝</button>
+    </div>
+
+    <!-- 奖励界面 -->
+    <div id="reward-screen" class="screen hidden">
+        <h2 class="title-text">战斗胜利！</h2>
+        <p>搜刮到了 <span class="stat-gold" id="reward-gold-text"></span> 🪙寻宝币。选择你的战利品：</p>
+        <div class="choice-container" id="reward-container"></div>
+    </div>
+
+    <!-- 商店界面 -->
+    <div id="shop-screen" class="screen hidden">
+        <h2 class="title-text">神秘补给站</h2>
+        <p>你的【终结技】与【镇镇之力】已在本节点重置！</p>
+        <div class="choice-container" id="shop-container"></div>
+        <button class="action-btn" onclick="nextFloor()">离开商店，继续冒险</button>
+    </div>
+
+    <!-- 游戏结束 -->
+    <div id="game-over-screen" class="screen hidden">
+        <h1 id="end-title"></h1>
+        <p id="end-desc" class="desc-text"></p>
+        <button class="action-btn" onclick="location.reload()">重新开始寻宝</button>
+    </div>
+
+    <!-- 图鉴模态框 -->
+    <div id="modal-pokedex" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closePokedex()">×</button>
+            <h2 class="title-text" style="margin-top:0;">📖 官方图鉴 (长按可滑动)</h2>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchDexTab('dex-chars')">寻宝人</button>
+                <button class="tab-btn" onclick="switchDexTab('dex-mobs')">怪物群</button>
+                <button class="tab-btn" onclick="switchDexTab('dex-items')">全道具/系统</button>
+            </div>
+            <div id="dex-chars" class="pokedex-list"></div>
+            <div id="dex-mobs" class="pokedex-list hidden"></div>
+            <div id="dex-items" class="pokedex-list hidden"></div>
+        </div>
+    </div>
+
+    <!-- 背包模态框 -->
+    <div id="modal-inventory" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeInventory()">×</button>
+            <h2 class="title-text" style="margin-top:0;">🎒 我的背包 (已获唯一道具)</h2>
+            <div id="inv-container" class="inventory-list"></div>
+        </div>
+    </div>
+
+    <!-- 引入核心逻辑 -->
+    <script src="data.js"></script>
+    <script src="events.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
