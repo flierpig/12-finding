@@ -202,3 +202,85 @@ button.action-btn { background: linear-gradient(90deg, #d97706, #f59e0b); color:
 ::-webkit-scrollbar-track { background: rgba(15,23,42,0.5); border-radius: 4px; }
 ::-webkit-scrollbar-thumb { background: rgba(71,85,105,0.7); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,0.9); }
+
+/* ==================== 手机端适配 ==================== */
+@media (max-width: 768px) {
+    body { padding: 8px; font-size: 14px; }
+    h1 { font-size: 22px; margin-bottom: 4px; }
+    .subtitle { font-size: 12px; margin-bottom: 12px; }
+    .screen { padding: 14px; border-radius: 12px; margin: 0 4px; }
+
+    /* 导航按钮换行并加大点击区域 */
+    .sys-nav { flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .sys-btn { padding: 10px 12px; font-size: 12px; min-width: 80px; border-radius: 6px; }
+
+    /* 状态栏缩小 */
+    #top-bar { padding: 10px 12px; border-radius: 12px; margin-bottom: 12px; }
+    .top-bar-location { font-size: 13px; }
+    .top-bar-bosses { font-size: 12px; }
+    .top-bar-stats { gap: 5px; }
+    .top-bar-stats .stat-item, .top-bar-stats .stat-gold { padding: 4px 8px; font-size: 12px; border-radius: 14px; }
+    .top-bar-stats .stat-label { font-size: 10px; }
+
+    /* 选人卡片：手机上双列 */
+    .grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .char-card { padding: 10px; }
+    .char-icon { font-size: 26px; }
+    .char-name { font-size: 13px; }
+    .char-desc, .char-ult { font-size: 11px; }
+
+    /* 事件界面 */
+    #event-icon { font-size: 48px; }
+    #event-title { font-size: 20px; }
+    #event-desc { font-size: 14px; padding: 12px 14px; }
+
+    /* 战斗UI：角色卡片纵向堆叠 */
+    .arena { flex-direction: column; gap: 10px; }
+    .fighter { padding: 14px 12px; border-radius: 14px; }
+    .fighter .char-icon { font-size: 36px; }
+    .fighter .char-name { font-size: 15px; margin-bottom: 10px; }
+    .hp-bar-bg { height: 18px; border-radius: 9px; }
+    .hp-text { font-size: 12px; }
+    .fighter-stats { font-size: 10px; }
+    .vs { flex-direction: row; gap: 10px; margin: 6px 0; }
+    .vs-text { font-size: 24px; }
+    .turn-counter { font-size: 12px; }
+
+    /* 技能按钮加大 */
+    .skill-bar { flex-direction: column; gap: 8px; }
+    #ult-btn, #zhen-btn { padding: 12px; font-size: 15px; border-radius: 10px; }
+
+    /* 日志区域 */
+    #log-box { height: 160px; padding: 10px; font-size: 12px; }
+
+    /* 奖励/商店按钮：手机上单列 */
+    .choice-container { flex-direction: column; gap: 10px; }
+    .choice-btn { min-width: auto; width: 100%; padding: 14px; font-size: 14px; }
+    .choice-btn h3 { font-size: 16px; margin: 0 0 4px 0; }
+
+    button.action-btn { padding: 12px 20px; font-size: 16px; width: 100%; margin-top: 16px; }
+
+    /* 模态框 */
+    .modal-content { width: 95%; padding: 14px; border-radius: 12px; }
+    .modal-close { font-size: 24px; top: 10px; right: 14px; }
+    .tabs { gap: 6px; margin-bottom: 14px; }
+    .tab-btn { font-size: 15px; padding: 4px 8px; }
+    .pokedex-list { grid-template-columns: 1fr; gap: 10px; }
+    .inventory-list { grid-template-columns: 1fr; gap: 10px; }
+
+    /* 网格地图：缩小格子 */
+    .grid-cell { width: 38px; height: 38px; font-size: 16px; border-radius: 8px; }
+    #grid-container { padding: 8px; gap: 5px !important; }
+    #grid-map-title { font-size: 20px; }
+    #grid-map-subtitle { font-size: 12px; margin-bottom: 10px; }
+    #grid-event-panel { padding: 14px; border-radius: 10px; }
+    #grid-event-panel h3 { font-size: 16px; }
+    #grid-event-panel p { font-size: 13px; }
+    #grid-event-panel .choice-btn { padding: 12px 16px; font-size: 14px; }
+
+    /* 方向按钮加大便于点击 */
+    #btn-up, #btn-down, #btn-left, #btn-right { padding: 10px 16px; font-size: 14px; }
+
+    /* 图鉴标签 */
+    .collab-badge { font-size: 9px; padding: 2px 6px; top: -6px; right: -6px; }
+}

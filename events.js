@@ -388,31 +388,333 @@ function getSnowBossOptions() {
     ];
 }
 
-// ==================== 冰原网格地图生成 ====================
-// 生成一个不规则的网格地图，节点之间随机连接
-// 不再是规则正方形，而是纵横交错的路径网络
-function generateSnowGrid() {
-    // 地图尺寸：限制为6-8宽，6-9高，确保一屏显示无需滚动
-    let width = 6 + Math.floor(Math.random() * 3);  // 6-8
-    let height = 6 + Math.floor(Math.random() * 4); // 6-9
-    let nodes = [];
-    let nodeMap = {}; // key: "r,c" -> node
+// ==================== 海岸事件池 ====================
+const coastEvents = [
+    {
+        id: 'ce_crab_ambush',
+        name: '礁石下的阴影',
+        icon: '🦀',
+        desc: '潮水退去，礁石缝隙中传来窸窣声，一只巨大的岩蟹正盯着你看。',
+        type: 'event',
+        options: [
+            { text: '拔剑迎战', result: { type: 'combat', mobId: 'crab' } },
+            { text: '悄悄绕开', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_seagull_flock',
+        name: '遮天鸥群',
+        icon: '🕊️',
+        desc: '头顶传来刺耳的鸣叫，一大群啸鸥盘旋而下，似乎把你当成了入侵者。',
+        type: 'event',
+        options: [
+            { text: '挥舞武器驱赶', result: { type: 'combat', mobId: 'seagull' } },
+            { text: '抱头躲藏', result: { type: 'move' } },
+            { text: '扔食物引开', result: { type: 'gold', amount: -5, text: '你扔出了食物，损失5金币' } }
+        ]
+    },
+    {
+        id: 'ce_jellyfish_glow',
+        name: '幽光海域',
+        icon: '🪼',
+        desc: '海面上漂浮着无数发光的水母，其中有一只体型异常庞大，散发着不祥的蓝光。',
+        type: 'event',
+        options: [
+            { text: '靠近观察', result: { type: 'combat', mobId: 'jellyfish' } },
+            { text: '远远绕开', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_tide_shrine',
+        name: '潮汐祭坛',
+        icon: '🌊',
+        desc: '一座半淹没在海水中的古老祭坛，上面刻满了关于潮汐的符文。',
+        type: 'event',
+        options: [
+            { text: '触摸祭坛', result: { type: 'combat', mobId: 'tide_bringer' } },
+            { text: '虔诚祈祷', result: { type: 'heal', amount: 0.25, text: '潮汐之力抚平了伤口，恢复25%生命' } },
+            { text: '无视它', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_sunken_chest',
+        name: '沉船宝藏',
+        icon: '⚓',
+        desc: '一艘古老的沉船半埋在沙滩中，船舱里隐约能看到宝箱的轮廓。',
+        type: 'event',
+        options: [
+            { text: '潜入船舱', result: { type: 'gold', amount: 30 } },
+            { text: '检查甲板', result: { type: 'gold', amount: 15 } },
+            { text: '离开', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_pearl_oyster',
+        name: '珍珠贝床',
+        icon: '🦪',
+        desc: '一片巨大的牡蛎群散落在浅滩中，有些贝壳微微张开，露出里面温润的光泽。',
+        type: 'event',
+        options: [
+            { text: '撬开取珠', result: { type: 'gold', amount: 25 } },
+            { text: '采集珍珠粉末', result: { type: 'heal', amount: 0.2, text: '珍珠粉末有治愈效果，恢复20%生命' } },
+            { text: '不要打扰', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_rogue_wave',
+        name: ' rogue浪突袭',
+        icon: '🌊',
+        desc: '毫无征兆地，一道巨浪从海面扑来，将你整个人卷入水中。',
+        type: 'event',
+        options: [
+            { text: '拼命挣扎', result: { type: 'heal', amount: -20, text: '你被浪拍在礁石上，损失20生命' } },
+            { text: '顺着水流', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_castaway',
+        name: '遇难水手',
+        icon: '⚓',
+        desc: '一个衣衫褴褛的水手蜷缩在礁石后面，他说自己的船被海妖击沉了。',
+        type: 'event',
+        options: [
+            { text: '分给他食物', result: { type: 'heal', amount: -10, text: '你分享了储备，损失10生命' } },
+            { text: '给他指路', result: { type: 'gold', amount: 20 } },
+            { text: '冷漠离开', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_coral_reef',
+        name: '珊瑚迷宫',
+        icon: '🪸',
+        desc: '一片五彩斑斓的珊瑚礁阻挡了去路，缝隙中似乎藏着什么。',
+        type: 'event',
+        options: [
+            { text: '穿梭采集', result: { type: 'gold', amount: 20 } },
+            { text: '寻找近路', result: { type: 'move' } },
+            { text: '绕远路', result: { type: 'heal', amount: -8, text: '被珊瑚刮伤，损失8生命' } }
+        ]
+    },
+    {
+        id: 'ce_drift_bottle',
+        name: '漂流瓶',
+        icon: '🍾',
+        desc: '沙滩上躺着一个精致的玻璃瓶，里面塞着一卷泛黄的羊皮纸。',
+        type: 'event',
+        options: [
+            { text: '打开阅读', result: { type: 'gold', amount: 15 } },
+            { text: '无视它', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_fish_market',
+        name: '渔人集市',
+        icon: '🐟',
+        desc: '几个渔民在海边搭起了临时摊位，新鲜的鱼获散发着咸腥的气息。',
+        type: 'shop',
+        options: [
+            { text: '看看有什么', result: { type: 'shop' } },
+            { text: '不买', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'ce_combat_random',
+        name: '海岸遭遇',
+        icon: '🌊',
+        desc: '海浪拍打着礁石，一个黑影从水中缓缓升起，挡住了去路！',
+        type: 'combat_random',
+        options: [
+            { text: '迎战', result: { type: 'combat_random' } }
+        ]
+    }
+];
 
-    // 生成基础节点（并非每个坐标都有节点，呈现不规则空洞）
+// ==================== 海岸Boss事件：深渊海妖巢穴 ====================
+const coastBossEvent = {
+    id: 'se_coast_boss',
+    name: '深渊漩涡',
+    icon: '🌀',
+    desc: '你来到了海岸的尽头，一个巨大的漩涡在海面上缓缓旋转，触手从深处伸出，一只庞大的海妖正注视着你。',
+    type: 'boss',
+    options: [
+        { text: '投掷鱼叉', result: { type: 'boss_combat', mode: 'harpoon' } },
+        { text: '正面迎战', result: { type: 'boss_combat', mode: 'normal' } },
+        { text: '潜入水下突袭', result: { type: 'boss_combat', mode: 'stealth' } }
+    ]
+};
+
+// ==================== 丛林事件池 ====================
+const jungleEvents = [
+    {
+        id: 'je_snake_bite',
+        name: '蛇影突袭',
+        icon: '🐍',
+        desc: '落叶堆中突然窜出一条毒牙蛇，獠牙上滴着墨绿色的毒液。',
+        type: 'event',
+        options: [
+            { text: '拔剑迎战', result: { type: 'combat', mobId: 'snake' } },
+            { text: '迅速后退', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_monkey_bandit',
+        name: '猴群劫道',
+        icon: '🐒',
+        desc: '树上传来吱吱的叫声，一群泼猴正冲你丢石头，领头的那只猴子手里还攥着你的钱包。',
+        type: 'event',
+        options: [
+            { text: '追上去抢回', result: { type: 'combat', mobId: 'monkey' } },
+            { text: '用食物交换', result: { type: 'gold', amount: -10, text: '你给了猴子一些金币买路财' } },
+            { text: '不跟畜生计较', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_venom_nest',
+        name: '蛛网密林',
+        icon: '🕸️',
+        desc: '前方的树木被巨大的蛛网覆盖，一只体型庞大的瘴蛛女王正盘踞在网中央。',
+        type: 'event',
+        options: [
+            { text: '烧掉蛛网', result: { type: 'combat', mobId: 'venom_spider' } },
+            { text: '绕远路', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_ancient_ruins',
+        name: '古傀遗迹',
+        icon: '🏛️',
+        desc: '丛林深处矗立着一座被藤蔓覆盖的石质遗迹，一尊石像的眼眶中闪烁着微弱的红光。',
+        type: 'event',
+        options: [
+            { text: '触碰石像', result: { type: 'combat', mobId: 'ancient_golem' } },
+            { text: '调查符文', result: { type: 'gold', amount: 20 } },
+            { text: '悄悄离开', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_herb_cache',
+        name: '草药丛',
+        icon: '🌿',
+        desc: '一片散发着清香的草药丛生长在阳光穿透的林间空地上，叶片上还挂着晨露。',
+        type: 'event',
+        options: [
+            { text: '采集草药', result: { type: 'heal', amount: 0.35, text: '采集了治愈草药，恢复35%生命' } },
+            { text: '寻找珍稀品种', result: { type: 'gold', amount: 15 } },
+            { text: '不打扰', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_mushroom_ring',
+        name: '妖精环',
+        icon: '🍄',
+        desc: '一圈散发着幽光的蘑菇围成了一个完美的圆环，中心似乎有什么东西在闪烁。',
+        type: 'event',
+        options: [
+            { text: '踏入圆环', result: { type: 'gold', amount: 30 } },
+            { text: '采集蘑菇', result: { type: 'heal', amount: -15, text: '蘑菇有毒！损失15生命' } },
+            { text: '敬而远之', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_quicksand',
+        name: '流沙陷阱',
+        icon: '🕳️',
+        desc: '你脚下的地面突然变软，身体开始缓缓下沉——这是沼泽中的流沙！',
+        type: 'event',
+        options: [
+            { text: '奋力挣扎', result: { type: 'heal', amount: -20, text: '体力透支，损失20生命' } },
+            { text: '放松身体慢慢爬出', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_lost_tribe',
+        name: '土著部落',
+        icon: '🛖',
+        desc: '树林间露出几座茅草屋，一群土著居民正围着篝火跳舞，他们注意到了你。',
+        type: 'event',
+        options: [
+            { text: '献上礼物', result: { type: 'gold', amount: -5, text: '你献上了一些金币作为礼物' } },
+            { text: '学习部落知识', result: { type: 'gold', amount: 20 } },
+            { text: '绕道离开', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_golden_idol',
+        name: '黄金神像',
+        icon: '🗿',
+        desc: '一棵倒下的巨树根部露出半尊黄金打造的小型神像，上面爬满了青苔。',
+        type: 'event',
+        options: [
+            { text: '挖出来带走', result: { type: 'gold', amount: 40 } },
+            { text: '擦拭祈福', result: { type: 'heal', amount: 0.15, text: '神像赐福，恢复15%生命' } },
+            { text: '不碰诅咒之物', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_rainstorm',
+        name: '丛林暴雨',
+        icon: '⛈️',
+        desc: '热带暴雨毫无征兆地倾泻而下，瞬间将能见度降到不足五米，地面变得湿滑难行。',
+        type: 'event',
+        options: [
+            { text: '冒雨前进', result: { type: 'heal', amount: -18, text: '淋雨后体力下降，损失18生命' } },
+            { text: '寻找避雨处', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_medicine_shop',
+        name: '部落药摊',
+        icon: '🍃',
+        desc: '一位裹着兽皮的巫医在树下支起了摊位，陶罐里煮着气味刺鼻的药汤。',
+        type: 'shop',
+        options: [
+            { text: '看看药材', result: { type: 'shop' } },
+            { text: '离开', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 'je_combat_random',
+        name: '丛林遭遇',
+        icon: '🌿',
+        desc: '灌木丛中传来窸窣声，一双发光的眼睛正死死盯着你！',
+        type: 'combat_random',
+        options: [
+            { text: '迎战', result: { type: 'combat_random' } }
+        ]
+    }
+];
+
+// ==================== 丛林Boss事件：古树核心 ====================
+const jungleBossEvent = {
+    id: 'se_jungle_boss',
+    name: '古树核心',
+    icon: '🌳',
+    desc: '你来到了丛林最深处，一棵参天古树的根系将整片土地覆盖，树干中央裂开了一张巨大的嘴，丛林主宰正在苏醒。',
+    type: 'boss',
+    options: [
+        { text: '点燃古树', result: { type: 'boss_combat', mode: 'fire' } },
+        { text: '正面迎战', result: { type: 'boss_combat', mode: 'normal' } },
+        { text: '切断根系', result: { type: 'boss_combat', mode: 'roots' } }
+    ]
+};
+
+// ==================== 通用网格地图生成 ====================
+// 支持冰原/海岸/丛林三种区域，通过参数传入不同的事件池和Boss事件
+// 规则：事件不重复（除了combat_random）、商店最多2个、精英怪节点唯一
+function generateRegionGrid(eventPool, bossEvent, regionId) {
+    let width = 6 + Math.floor(Math.random() * 3);
+    let height = 6 + Math.floor(Math.random() * 4);
+    let nodes = [];
+    let nodeMap = {};
+
     for(let r = 0; r < height; r++) {
         for(let c = 0; c < width; c++) {
-            // 边缘和中心区域保留较高密度，其他区域随机生成，制造纵横交错感
             let isEdge = (r === 0 || c === 0 || r === height-1 || c === width-1);
             let density = isEdge ? 0.82 : 0.48;
             if(Math.random() < density) {
                 let node = {
-                    id: `${r},${c}`,
-                    r: r, c: c,
-                    type: 'event',
-                    visited: false,
-                    event: null,
-                    connections: [], // 连接的邻居节点id
-                    x: c, y: r
+                    id: `${r},${c}`, r: r, c: c,
+                    type: 'event', visited: false, event: null, connections: [], x: c, y: r
                 };
                 nodes.push(node);
                 nodeMap[node.id] = node;
@@ -420,56 +722,120 @@ function generateSnowGrid() {
         }
     }
 
-    // 确保起点和终点存在
     let startNode = nodeMap['0,0'] || createNodeAt(0, 0, nodes, nodeMap, width, height);
     startNode.type = 'start';
     startNode.visited = true;
 
-    let bossR = height - 1;
-    let bossC = width - 1;
+    let bossR = height - 1, bossC = width - 1;
     let bossNode = nodeMap[`${bossR},${bossC}`] || createNodeAt(bossR, bossC, nodes, nodeMap, width, height);
     bossNode.type = 'boss';
-    bossNode.event = snowBossEvent;
+    bossNode.event = bossEvent;
 
-    // 保证起点至少有一个可直接移动的邻居（避免玩家出生即被困）
     ensureStartNeighbor(startNode, nodes, nodeMap, width, height);
 
-    // 建立连接：每个节点尝试与上下左右的邻居连接
     let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
     nodes.forEach(node => {
         dirs.forEach(d => {
             let nr = node.r + d[0], nc = node.c + d[1];
             let key = `${nr},${nc}`;
-            if(nodeMap[key]) {
-                // 随机决定是否连接，纵横交错且路径分叉更多
-                if(Math.random() < 0.62) {
-                    if(!node.connections.includes(key)) node.connections.push(key);
-                    if(!nodeMap[key].connections.includes(node.id)) nodeMap[key].connections.push(node.id);
-                }
+            if(nodeMap[key] && Math.random() < 0.62) {
+                if(!node.connections.includes(key)) node.connections.push(key);
+                if(!nodeMap[key].connections.includes(node.id)) nodeMap[key].connections.push(node.id);
             }
         });
     });
 
-    // 确保整个图是连通的：使用BFS检查，如果存在孤立节点则强制连接
     ensureConnected(nodes, nodeMap);
 
-    // 为事件节点分配随机事件
-    let eventPool = [...snowEvents];
-    nodes.forEach(node => {
-        if(node.type === 'event') {
-            node.event = eventPool[Math.floor(Math.random() * eventPool.length)];
-        }
-    });
+    // 分配事件：遵循规则
+    assignEventsToNodes(nodes, eventPool, regionId);
 
     return {
-        width: width,
-        height: height,
-        nodes: nodes,
-        nodeMap: nodeMap,
-        startNode: startNode,
-        bossNode: bossNode,
-        currentNodeId: startNode.id
+        width: width, height: height, nodes: nodes, nodeMap: nodeMap,
+        startNode: startNode, bossNode: bossNode, currentNodeId: startNode.id, regionId: regionId
     };
+}
+
+// 分配事件到节点，遵循规则
+function assignEventsToNodes(nodes, eventPool, regionId) {
+    let eventNodes = nodes.filter(n => n.type === 'event');
+    if(eventNodes.length === 0) return;
+
+    // 获取怪物数据用于判断精英怪
+    let mobPool = { snow: snowMobs, coast: coastMobs, jungle: jungleMobs };
+    let mobs = mobPool[regionId] || {};
+
+    // 分离事件类型
+    let oneTimeEvents = eventPool.filter(e => e.type !== 'combat_random'); // 一次性事件
+    let repeatableEvents = eventPool.filter(e => e.type === 'combat_random'); // 可重复事件
+    let shopEvents = oneTimeEvents.filter(e => e.type === 'shop'); // 商店事件
+    let eliteEvents = oneTimeEvents.filter(e => {
+        // 判断是否精英怪事件：检查mobId对应的怪物是否是精英
+        if(e.options && e.options[0] && e.options[0].result && e.options[0].result.mobId) {
+            let mob = mobs[e.options[0].result.mobId];
+            return mob && mob.isElite;
+        }
+        return false;
+    });
+
+    // 随机打乱一次性事件
+    oneTimeEvents.sort(() => Math.random() - 0.5);
+
+    // 统计已使用的事件和精英怪
+    let usedEventIds = new Set();
+    let usedEliteMobs = new Set();
+    let shopCount = 0;
+    const maxShops = 2;
+
+    eventNodes.forEach(node => {
+        let availableEvents = [];
+
+        // 优先从剩余的一次性事件中选择
+        let remainingOneTime = oneTimeEvents.filter(e => {
+            // 检查是否是商店且已达到上限
+            if(e.type === 'shop') {
+                return shopCount < maxShops;
+            }
+            // 检查是否是精英怪且已使用
+            if(e.options && e.options[0] && e.options[0].result && e.options[0].result.mobId) {
+                let mobId = e.options[0].result.mobId;
+                let mob = mobs[mobId];
+                if(mob && mob.isElite && usedEliteMobs.has(mobId)) {
+                    return false;
+                }
+            }
+            // 检查事件是否已使用
+            return !usedEventIds.has(e.id);
+        });
+
+        if(remainingOneTime.length > 0) {
+            let event = remainingOneTime[0];
+            node.event = event;
+            usedEventIds.add(event.id);
+
+            // 统计商店数量
+            if(event.type === 'shop') {
+                shopCount++;
+            }
+
+            // 统计精英怪
+            if(event.options && event.options[0] && event.options[0].result && event.options[0].result.mobId) {
+                let mobId = event.options[0].result.mobId;
+                let mob = mobs[mobId];
+                if(mob && mob.isElite) {
+                    usedEliteMobs.add(mobId);
+                }
+            }
+        } else if(repeatableEvents.length > 0) {
+            // 如果一次性事件用完了，使用可重复事件（combat_random）
+            node.event = repeatableEvents[Math.floor(Math.random() * repeatableEvents.length)];
+        }
+    });
+}
+
+// 兼容旧调用：冰原网格
+function generateSnowGrid() {
+    return generateRegionGrid(snowEvents, snowBossEvent, 'snow');
 }
 
 function createNodeAt(r, c, nodes, nodeMap, width, height) {

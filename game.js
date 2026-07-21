@@ -29,11 +29,12 @@ let badRngCount = 0;
 let luckZhenZhenActive = false, critZhenZhenActive = false, immortalZhenZhenActive = false, overloadZhenZhenActive = false;
 let overloadAtkBonus = 0, overloadHpBonus = 0;
 
-// --- 冰原网格地图变量 ---
-let snowGrid = null;
-let snowGridPos = { r: 0, c: 0 };
-let snowGridInEvent = false;
-let currentSnowEvent = null; // 当前触发的事件缓存
+// --- 通用区域网格地图变量 ---
+let regionGrid = null;
+let regionGridPos = { r: 0, c: 0 };
+let regionGridInEvent = false;
+let currentRegionEvent = null; // 当前触发的事件缓存
+let currentRegion = ''; // 'snow'|'coast'|'jungle'
 
 const show = (id) => document.getElementById(id).classList.remove('hidden');
 const hide = (id) => document.getElementById(id).classList.add('hidden');
@@ -51,6 +52,11 @@ window.onload = () => {
         grid.appendChild(card);
     }
     buildPokedex();
+
+    // 窗口大小变化时重新渲染网格地图以适配手机/PC
+    window.addEventListener('resize', () => {
+        if(regionGrid) renderGrid();
+    });
 };
 
 function buildPokedex() {
@@ -155,7 +161,7 @@ function initGame(playerKey) {
     overloadAtkBonus = 0; overloadHpBonus = 0;
 
     // 网格地图重置
-    snowGrid = null; snowGridPos = { r: 0, c: 0 }; snowGridInEvent = false; currentSnowEvent = null;
+    regionGrid = null; regionGridPos = { r: 0, c: 0 }; regionGridInEvent = false; currentRegionEvent = null;
 
     // 旧Boss池保留，用于非最终Boss的守关者生成
     bossPool = Object.keys(baseCharData).filter(k => k !== playerKey);
@@ -174,7 +180,8 @@ function initGame(playerKey) {
 }
 
 function updateTopBar() {
-    let locName = currentNode ? currentNode.name : (snowGrid ? '永冻雪地' : '未知之地');
+    let regionNames = { snow: '永冻雪地', coast: '风暴海岸', jungle: '瘴气丛林' };
+    let locName = currentNode ? currentNode.name : (regionGrid ? regionNames[currentRegion] || '未知之地' : '未知之地');
     document.getElementById('ui-location').innerText = locName;
     document.getElementById('ui-bosses').innerText = `${defeatedBosses.length}/3`;
     document.getElementById('ui-hp').innerText = `${Math.floor(player.hp)}/${player.maxHp}`;
@@ -196,9 +203,9 @@ function enterNode(nodeId) {
     // 每个新节点重置一次性能力
     ultUsedThisFloor = false; zhenZhenUsedThisFloor = false;
 
-    // 冰原地图：进入网格模式
-    if(nodeId === 'snow_start') {
-        enterSnowMap();
+    // 区域地图：进入网格模式（冰原/海岸/丛林）
+    if(nodeId === 'snow_start' || nodeId === 'coast_start' || nodeId === 'jungle_start') {
+        enterRegionMap(nodeId);
         return;
     }
 
@@ -262,44 +269,56 @@ function resolveEventOption(result) {
     }
 }
 
-// ==================== 冰原网格地图系统 ====================
+// ==================== 通用区域网格地图系统 ====================
 
-function enterSnowMap() {
-    // 生成随机网格
-    snowGrid = generateSnowGrid();
-    snowGridPos = { r: 0, c: 0 };
-    snowGridInEvent = false;
-    currentSnowEvent = null;
+const regionMetaGrid = {
+    snow_start:  { title: '❄️ 永冻雪地', eventPool: snowEvents,     bossEvent: snowBossEvent,     region: 'snow' },
+    coast_start: { title: '🌊 风暴海岸', eventPool: coastEvents,    bossEvent: coastBossEvent,    region: 'coast' },
+    jungle_start:{ title: '🌿 瘴气丛林', eventPool: jungleEvents,   bossEvent: jungleBossEvent,   region: 'jungle' }
+};
+
+function enterRegionMap(nodeId) {
+    let meta = regionMetaGrid[nodeId];
+    if(!meta) { console.error('未知区域节点:', nodeId); return; }
+
+    currentRegion = meta.region;
+    regionGrid = generateRegionGrid(meta.eventPool, meta.bossEvent, meta.region);
+    regionGridPos = { r: 0, c: 0 };
+    regionGridInEvent = false;
+    currentRegionEvent = null;
 
     hide('event-screen'); hide('battle-screen'); hide('reward-screen'); hide('shop-screen');
     show('grid-map-screen');
 
-    document.getElementById('grid-map-title').innerText = '❄️ 永冻雪地';
+    document.getElementById('grid-map-title').innerText = meta.title;
     updateTopBar();
     renderGrid();
     updateGridButtons();
 }
 
 function getCurrentNode() {
-    if(!snowGrid) return null;
-    return snowGrid.nodeMap[`${snowGridPos.r},${snowGridPos.c}`];
+    if(!regionGrid) return null;
+    return regionGrid.nodeMap[`${regionGridPos.r},${regionGridPos.c}`];
 }
 
 function renderGrid() {
     let container = document.getElementById('grid-container');
     container.innerHTML = '';
-    container.style.gridTemplateColumns = `repeat(${snowGrid.width}, 50px)`;
-    container.style.gridTemplateRows = `repeat(${snowGrid.height}, 50px)`;
+    // 手机端使用更小的格子尺寸
+    let isMobile = window.innerWidth <= 768;
+    let cellSize = isMobile ? 40 : 50;
+    container.style.gridTemplateColumns = `repeat(${regionGrid.width}, ${cellSize}px)`;
+    container.style.gridTemplateRows = `repeat(${regionGrid.height}, ${cellSize}px)`;
 
-    for(let r = 0; r < snowGrid.height; r++) {
-        for(let c = 0; c < snowGrid.width; c++) {
-            let node = snowGrid.nodeMap[`${r},${c}`];
+    for(let r = 0; r < regionGrid.height; r++) {
+        for(let c = 0; c < regionGrid.width; c++) {
+            let node = regionGrid.nodeMap[`${r},${c}`];
             let div = document.createElement('div');
             div.className = 'grid-cell';
             div.dataset.r = r;
             div.dataset.c = c;
 
-            let isCurrent = (r === snowGridPos.r && c === snowGridPos.c);
+            let isCurrent = (r === regionGridPos.r && c === regionGridPos.c);
             let isConnected = node && getCurrentNode() && getCurrentNode().connections.includes(node.id);
 
             if(!node) {
@@ -332,7 +351,7 @@ function renderGrid() {
         }
     }
 
-    document.getElementById('grid-pos-text').innerText = `${snowGridPos.r},${snowGridPos.c}`;
+    document.getElementById('grid-pos-text').innerText = `${regionGridPos.r},${regionGridPos.c}`;
 }
 
 function updateGridButtons() {
@@ -349,7 +368,7 @@ function updateGridButtons() {
 }
 
 function gridMove(direction) {
-    if(snowGridInEvent) return;
+    if(regionGridInEvent) return;
     let current = getCurrentNode();
     if(!current) return;
     let targetId = null;
@@ -359,9 +378,9 @@ function gridMove(direction) {
     if(direction === 'right') targetId = `${current.r},${current.c+1}`;
 
     if(targetId && current.connections.includes(targetId)) {
-        let target = snowGrid.nodeMap[targetId];
+        let target = regionGrid.nodeMap[targetId];
         if(target) {
-            snowGridPos = { r: target.r, c: target.c };
+            regionGridPos = { r: target.r, c: target.c };
         }
     }
 
@@ -385,32 +404,41 @@ function triggerGridEvent() {
     if(cell.visited && cell.type !== 'start') return;
 
     cell.visited = true;
-    snowGridInEvent = true;
+    regionGridInEvent = true;
 
     let panel = document.getElementById('grid-event-panel');
     panel.innerHTML = '';
 
     if(cell.type === 'start') {
         panel.innerHTML = '<p style="color:#94a3b8;">这里是你的出发点，寒风从四面八方吹来。选择一个方向前进吧。</p>';
-        snowGridInEvent = false;
+        regionGridInEvent = false;
         renderGrid();
         return;
     }
 
     if(cell.type === 'boss') {
-        currentSnowEvent = snowBossEvent;
-        panel.innerHTML = `<h3>${snowBossEvent.icon} ${snowBossEvent.name}</h3><p>${snowBossEvent.desc}</p>`;
-        let bossOptions = getSnowBossOptions();
+        let bossEvt = cell.event || snowBossEvent;
+        currentRegionEvent = bossEvt;
+        panel.innerHTML = `<h3>${bossEvt.icon} ${bossEvt.name}</h3><p>${bossEvt.desc}</p>`;
+        let bossOptions = bossEvt.options;
         bossOptions.forEach(opt => {
             let btn = document.createElement('button');
             btn.className = 'choice-btn';
-            if(opt.disabled) {
-                btn.classList.add('disabled');
-                btn.disabled = true;
-                btn.title = '需要道具：火把';
+            // 冰原Boss特殊处理：火把道具检查
+            if(currentRegion === 'snow' && opt.text === '一把火烧了它！') {
+                let hasTorch = ownedItems.some(it => it.id === 'torch') || ownedItems.some(it => it.id === 'r_torch') || ownedItems.some(it => it.id === 's_torch');
+                if(!hasTorch) {
+                    btn.classList.add('disabled');
+                    btn.disabled = true;
+                    btn.title = '需要道具：火把';
+                    btn.innerHTML = `<h3>${opt.text}</h3><p style="font-size:12px;color:#64748b;">需要火把</p>`;
+                    btn.onclick = null;
+                    panel.appendChild(btn);
+                    return;
+                }
             }
-            btn.innerHTML = `<h3>${opt.text}</h3>${opt.disabled ? '<p style="font-size:12px;color:#64748b;">需要火把</p>' : ''}`;
-            btn.onclick = () => { if(!opt.disabled) resolveSnowEventOption(opt.result); };
+            btn.innerHTML = `<h3>${opt.text}</h3>`;
+            btn.onclick = () => resolveSnowEventOption(opt.result);
             panel.appendChild(btn);
         });
         renderGrid();
@@ -419,7 +447,7 @@ function triggerGridEvent() {
 
     // 普通事件
     let evt = cell.event;
-    currentSnowEvent = evt;
+    currentRegionEvent = evt;
     panel.innerHTML = `<h3>${evt.icon} ${evt.name}</h3><p>${evt.desc}</p>`;
 
     evt.options.forEach(opt => {
@@ -437,34 +465,40 @@ function resolveSnowEventOption(result) {
     let panel = document.getElementById('grid-event-panel');
 
     if(result.type === 'move') {
-        snowGridInEvent = false;
+        regionGridInEvent = false;
         panel.innerHTML = '<p style="color:#94a3b8;">你选择了离开，继续探索这片冰原吧。</p>';
         renderGrid();
     }
     else if(result.type === 'combat' || result.type === 'combat_random') {
         let mobId = result.mobId;
         if(result.type === 'combat_random') {
-            // 随机选择冰镇或冷俊
-            let pool = ['ice_block', 'cold_jun'];
+            // 根据当前区域随机选择小怪
+            let pools = {
+                snow: ['ice_block', 'cold_jun'],
+                coast: ['crab', 'seagull'],
+                jungle: ['snake', 'monkey']
+            };
+            let pool = pools[currentRegion] || pools.snow;
             mobId = pool[Math.floor(Math.random() * pool.length)];
         }
-        prepareSnowMob(mobId);
+        prepareRegionMob(mobId);
         startCombat();
     }
     else if(result.type === 'boss_combat') {
-        prepareSnowBoss(result.mode);
+        prepareRegionBoss(result.mode);
         startCombat();
     }
     else if(result.type === 'shop') {
-        snowGridInEvent = false;
-        window._shopNextNode = 'snow_start'; // 商店结束后回到网格
+        regionGridInEvent = false;
+        window._shopNextNode = null; // 网格商店结束后不进入节点，直接回网格
+        window._returnToGrid = true;
         generateShop();
         hide('grid-map-screen'); show('shop-screen');
     }
     else if(result.type === 'gold') {
         gold += result.amount;
         updateTopBar();
-        snowGridInEvent = false;
+        regionGridInEvent = false;
         panel.innerHTML = `<p style="color:var(--gold);">🪙 获得了 ${result.amount} 寻宝币！</p>`;
         renderGrid();
     }
@@ -478,35 +512,85 @@ function resolveSnowEventOption(result) {
             player.hp = Math.max(1, player.hp + result.amount);
         }
         updateTopBar();
-        snowGridInEvent = false;
+        regionGridInEvent = false;
         panel.innerHTML = `<p>${result.text || (result.amount > 0 ? '恢复了生命值。' : '受到了伤害。')}</p>`;
         renderGrid();
     }
     else if(result.type === 'nothing') {
-        snowGridInEvent = false;
+        regionGridInEvent = false;
         panel.innerHTML = '<p style="color:#94a3b8;">什么都没发生。</p>';
         renderGrid();
     }
 }
 
-function prepareSnowMob(mobId) {
+function prepareRegionMob(mobId) {
     let scale = getDifficultyScale();
     duckJunDefeatedThisRound = false;
-    let mob = snowMobs[mobId];
+    // 根据当前区域选择怪物池
+    let mobPool = { snow: snowMobs, coast: coastMobs, jungle: jungleMobs };
+    let pool = mobPool[currentRegion] || snowMobs;
+    let mob = pool[mobId];
     if(!mob) { prepareEnemyForNode({}); return; }
     enemy = JSON.parse(JSON.stringify(mob));
     enemy.maxHp = Math.floor(enemy.maxHp * scale);
     enemy.hp = enemy.maxHp;
     enemy.atk = Math.floor(enemy.atk * scale);
-    // 特殊标记用于战斗逻辑
-    enemy.isSnowMob = true;
+    // 特殊标记用于战斗逻辑（保留 isSnowMob 兼容旧逻辑，新增 isRegionMob）
+    enemy.isRegionMob = true;
+    if(currentRegion === 'snow') enemy.isSnowMob = true;
 }
 
-function prepareSnowBoss(mode) {
+function prepareRegionBoss(mode) {
     let scale = getDifficultyScale();
     duckJunDefeatedThisRound = false;
 
-    // 战斗模式：torch / normal / dread
+    // 根据区域生成不同Boss
+    if(currentRegion === 'coast') {
+        prepareCoastBoss(mode, scale);
+    } else if(currentRegion === 'jungle') {
+        prepareJungleBoss(mode, scale);
+    } else {
+        prepareSnowBoss(mode, scale);
+    }
+}
+
+function prepareCoastBoss(mode, scale) {
+    let isStealth = (mode === 'stealth');
+    let isHarpoon = (mode === 'harpoon');
+    enemy = {
+        id: 'coast_boss_mob', icon: '🌀', name: '深渊海妖',
+        hp: 600, maxHp: 600, atk: 26, speed: 10, crit: 0, lifesteal: 0, dodge: 0,
+        isCoastBoss: true, bossMode: mode,
+        tentacleStun: 0,
+        rewardTier: isStealth ? 3 : (isHarpoon ? 2 : 1)
+    };
+    enemy.maxHp = Math.floor(enemy.maxHp * scale * 1.4); enemy.hp = enemy.maxHp;
+    enemy.atk = Math.floor(enemy.atk * scale * 1.2);
+    if(isStealth) { enemy.maxHp = Math.floor(enemy.maxHp * 1.3); enemy.hp = enemy.maxHp; enemy.atk = Math.floor(enemy.atk * 1.3); }
+    log(`<span class="log-boss">👑👑👑 [Boss战开始] ${enemy.name} 从漩涡中现身！</span>`);
+    if(isStealth) log(`<span class="log-boss-warning">⚠️ 水下突袭！海妖的触手更加狂暴，但奖励更丰厚！</span>`);
+    if(isHarpoon) log(`<span class="log-boss">🔱 鱼叉刺穿了海妖的触手，它的速度降低了！</span>`);
+}
+
+function prepareJungleBoss(mode, scale) {
+    let isFire = (mode === 'fire');
+    let isRoots = (mode === 'roots');
+    enemy = {
+        id: 'jungle_boss_mob', icon: '🌳', name: '丛林主宰',
+        hp: 700, maxHp: 700, atk: 24, speed: 6, crit: 0, lifesteal: 0, dodge: 0,
+        isJungleBoss: true, bossMode: mode,
+        regeneration: 10,
+        rewardTier: isRoots ? 3 : (isFire ? 2 : 1)
+    };
+    enemy.maxHp = Math.floor(enemy.maxHp * scale * 1.4); enemy.hp = enemy.maxHp;
+    enemy.atk = Math.floor(enemy.atk * scale * 1.2);
+    if(isRoots) { enemy.maxHp = Math.floor(enemy.maxHp * 1.3); enemy.hp = enemy.maxHp; enemy.atk = Math.floor(enemy.atk * 1.3); }
+    log(`<span class="log-boss">👑👑👑 [Boss战开始] ${enemy.name} 从古树中苏醒！</span>`);
+    if(isRoots) log(`<span class="log-boss-warning">⚠️ 你切断了它的根系！古树狂暴了，但奖励更丰厚！</span>`);
+    if(isFire) log(`<span class="log-boss">🔥 火焰烧伤了古树，它的再生能力被削弱了！</span>`);
+}
+
+function prepareSnowBoss(mode, scale) {
     let isDread = (mode === 'dread');
     let isTorch = (mode === 'torch');
 
@@ -518,33 +602,27 @@ function prepareSnowBoss(mode) {
         crit: 0, lifesteal: 0, dodge: 0,
         isSnowBoss: true,
         bossMode: mode,
-        // 冰盾系统
-        iceShield: 3, // 开局3层，每层减伤20%
-        freezeBar: 0, // 冻结条
-        freezeThreshold: 3, // 累计3次后冻结一回合
-        frozenTurns: 0, // 当前冻结回合数
-        turnCounter: 0, // 回合计数器（用于每2回合产生冰盾）
-        // 威慑模式
+        iceShield: 3,
+        freezeBar: 0,
+        freezeThreshold: 3,
+        frozenTurns: 0,
+        turnCounter: 0,
         dread: isDread,
         torchUsed: isTorch,
-        rewardTier: isDread ? 3 : (isTorch ? 1 : 2) // 奖励等级
+        rewardTier: isDread ? 3 : (isTorch ? 1 : 2)
     };
 
-    // 火把模式：Boss无法产生冰盾
-    if(isTorch) {
-        enemy.iceShield = 0;
-    }
-
-    // 威慑模式：Boss属性增强
-    if(isDread) {
-        enemy.maxHp = Math.floor(enemy.maxHp * 1.3);
-        enemy.hp = enemy.maxHp;
-        enemy.atk = Math.floor(enemy.atk * 1.3);
-    }
+    if(isTorch) { enemy.iceShield = 0; }
+    if(isDread) { enemy.maxHp = Math.floor(enemy.maxHp * 1.3); enemy.hp = enemy.maxHp; enemy.atk = Math.floor(enemy.atk * 1.3); }
 
     enemy.maxHp = Math.floor(enemy.maxHp * scale * 1.4);
     enemy.hp = enemy.maxHp;
     enemy.atk = Math.floor(enemy.atk * scale * 1.2);
+
+    log(`<span class="log-boss">👑👑👑 [Boss战开始] ${enemy.name} 登场！</span>`);
+    if(isDread) log(`<span class="log-boss-warning">⚠️ 威慑领域展开！本场战斗中你无法暴击、无法闪避！但胜利后的奖励将更加丰厚！</span>`);
+    if(isTorch) log(`<span class="log-boss">🔥 火把的光芒压制了寒气！${enemy.name} 无法生成冰盾！</span>`);
+    log(`<span class="log-boss">🛡️ 菇菇祭祀拥有 ${enemy.iceShield} 层冰盾，每层减伤20%！</span>`);
 }
 
 // ==================== 网格系统结束 ====================
@@ -1013,7 +1091,7 @@ function checkDeath() {
         updateBattleUI(); updateTopBar(); checkZhenZhenBtn();
 
         if(player.hp <= 0) {
-            let locName = currentNode ? currentNode.name : (snowGrid ? '永冻雪地' : '未知之地');
+            let locName = currentNode ? currentNode.name : (regionGrid ? '永冻雪地' : '未知之地');
             setTimeout(() => { hide('battle-screen'); hide('top-bar'); show('game-over-screen'); document.getElementById('end-title').innerHTML = "💀 寻宝失败 💀"; document.getElementById('end-desc').innerHTML = `你倒在了 <b>${locName}</b>。`; }, 1000);
         } else {
             log(`🏆 战斗胜利！`); show('battle-end-btn'); document.getElementById('ult-btn').disabled = true;
@@ -1061,28 +1139,30 @@ function log(msg) { let box = document.getElementById('log-box'); box.innerHTML 
 
 function handleAcquireItem(item) {
     if(item.exec) item.exec();
-    if (item.isUnique) { 
-        ownedItems.push(item); 
-        if(currentZhenZhen === 'overload' && !zhenZhenUnlocked) unlockZhenZhen();
-    }
+    ownedItems.push(item);
+    if(item.isUnique && currentZhenZhen === 'overload' && !zhenZhenUnlocked) unlockZhenZhen();
     claimRewardDone();
 }
 
 function endCombat() {
     // 判断是否来自网格地图
-    let fromGrid = (snowGrid !== null);
-    let isGridBoss = (enemy && enemy.isSnowBoss);
+    let fromGrid = (regionGrid !== null);
+    let isGridBoss = (enemy && (enemy.isSnowBoss || enemy.isCoastBoss || enemy.isJungleBoss));
+    let bossIdMap = { snow_boss_mob: 'snow_boss', coast_boss_mob: 'coast_boss', jungle_boss_mob: 'jungle_boss' };
+    let regionNameMap = { snow: '冰原', coast: '海岸', jungle: '丛林' };
 
     let dropGold = (isGridBoss || (currentNode && currentNode.type === 'boss')) ? Math.floor(Math.random()*30+60) : Math.floor(Math.random()*15 + 15);
     gold += dropGold; updateTopBar();
 
     // 网格地图 Boss 战斗
     if(fromGrid && isGridBoss) {
-        if(!defeatedBosses.includes('snow_boss')) defeatedBosses.push('snow_boss');
+        let bossId = bossIdMap[enemy.id] || 'snow_boss';
+        if(!defeatedBosses.includes(bossId)) defeatedBosses.push(bossId);
         let rewardTier = enemy.rewardTier || 2;
-        let bossName = enemy.name || '菇菇祭祀';
+        let bossName = enemy.name || 'Boss';
+        let regionName = regionNameMap[currentRegion] || '区域';
         log(`🏆 击败了 ${bossName}！`); show('battle-end-btn');
-        document.getElementById('battle-end-btn').innerText = '返回冰原';
+        document.getElementById('battle-end-btn').innerText = `返回${regionName}`;
         document.getElementById('battle-end-btn').onclick = () => {
             hide('battle-screen');
             if(defeatedBosses.length >= 3) {
@@ -1091,7 +1171,7 @@ function endCombat() {
                 document.getElementById('end-desc').innerHTML = `你击败了所有Boss，找到了传说中的宝藏！`;
             } else {
                 // 标记Boss格子已击败，返回网格
-                snowGridInEvent = false;
+                regionGridInEvent = false;
                 show('grid-map-screen');
                 renderGrid();
                 let panel = document.getElementById('grid-event-panel');
@@ -1101,7 +1181,7 @@ function endCombat() {
                 // 添加离开选项
                 let btn = document.createElement('button');
                 btn.className = 'choice-btn';
-                btn.innerHTML = '<h3>🚪 离开冰原，前往世界</h3>';
+                btn.innerHTML = `<h3>🚪 离开${regionName}，前往世界</h3>`;
                 btn.onclick = () => enterNode('start');
                 panel.appendChild(btn);
             }
@@ -1174,7 +1254,7 @@ function endCombat() {
         return;
     }
 
-    let filteredPool = rewardPool.filter(item => { if (item.isUnique && ownedItems.some(owned => owned.id === item.id)) return false; return true; });
+    let filteredPool = rewardPool.filter(item => { if (ownedItems.some(owned => owned.id === item.id)) return false; return true; });
     let shuffled = filteredPool.sort(() => 0.5 - Math.random()).slice(0, 3);
     shuffled.forEach((item) => {
         let btn = document.createElement('div'); 
@@ -1190,10 +1270,10 @@ function endCombat() {
 function claimRewardDone() {
     updateTopBar();
     // 如果来自网格地图，返回网格
-    if(snowGrid) {
+    if(regionGrid) {
         hide('reward-screen');
         show('grid-map-screen');
-        snowGridInEvent = false;
+        regionGridInEvent = false;
         renderGrid();
         let panel = document.getElementById('grid-event-panel');
         panel.innerHTML = '<p style="color:#94a3b8;">奖励已领取，继续探索吧。</p>';
@@ -1213,8 +1293,8 @@ function openShopFromNode(node) {
 }
 
 function generateShop() {
-    let currentPool = [...shopPool].filter(item => { if (item.isUnique && ownedItems.some(owned => owned.id === item.id)) return false; return true; });
-    if(player.id === 'soso5' && sosoDanceInterval > 2 && Math.random() < 0.8) { currentPool.push(specialItems.find(i => i.id === 's7_ticket')); }
+    let currentPool = [...shopPool].filter(item => { if (ownedItems.some(owned => owned.id === item.id)) return false; return true; });
+    if(player.id === 'soso5' && sosoDanceInterval > 2 && !ownedItems.some(o => o.id === 's7_ticket') && Math.random() < 0.8) { currentPool.push(specialItems.find(i => i.id === 's7_ticket')); }
 
     let shuffled = currentPool.sort(() => 0.5 - Math.random()).slice(0, 3);
     let container = document.getElementById('shop-container'); container.innerHTML = '';
@@ -1251,17 +1331,21 @@ function checkShopButtons() {
 
 function nextFloor() {
     // 网格地图商店返回
-    if(snowGrid) {
+    if(regionGrid) {
         hide('shop-screen');
         show('grid-map-screen');
-        snowGridInEvent = false;
+        regionGridInEvent = false;
         renderGrid();
         let panel = document.getElementById('grid-event-panel');
         panel.innerHTML = '<p style="color:#94a3b8;">购物完毕，继续探索吧。</p>';
         return;
     }
     // 新系统：离开商店，进入预设的下一个节点
-    if(window._shopNextNode) {
+    if(window._returnToGrid) {
+        window._returnToGrid = false;
+        hide('shop-screen'); show('grid-map-screen');
+        updateTopBar(); renderGrid(); updateGridButtons();
+    } else if(window._shopNextNode) {
         enterNode(window._shopNextNode);
         window._shopNextNode = null;
     } else {

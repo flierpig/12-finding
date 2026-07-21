@@ -27,6 +27,26 @@ const snowMobs = {
     zhen_erwa: { id:'zhen_erwa', icon: '👶', name: '镇二娃', hp: 170, maxHp: 170, atk: 20, speed: 10, desc:'被冰冻封印的孩童怨灵，减速光环永久降低敌人速度', special: 'slow_aura', isElite: true }
 };
 
+// 【海岸专属怪物】
+const coastMobs = {
+    // 小怪
+    crab:      { id:'crab', icon: '🦀', name: '岩蟹', hp: 65, maxHp: 65, atk: 9, speed: 7, desc:'藏在礁石下的硬壳蟹，攻击有几率附加流血效果', special: 'bleed' },
+    seagull:   { id:'seagull', icon: '🕊️', name: '啸鸥', hp: 50, maxHp: 50, atk: 11, speed: 14, desc:'成群盘旋的海鸥，速度极快但身板脆弱', special: 'swift' },
+    // 精英
+    jellyfish: { id:'jellyfish', icon: '🪼', name: '幽光水母', hp: 190, maxHp: 190, atk: 15, speed: 6, desc:'深海漂来的发光水母，带有麻痹毒素', special: 'paralyze', isElite: true },
+    tide_bringer: { id:'tide_bringer', icon: '🌊', name: '唤潮者', hp: 220, maxHp: 220, atk: 18, speed: 4, desc:'古老的海底祭司，能召唤潮汐冲击打断敌人行动', special: 'tide_stun', isElite: true }
+};
+
+// 【丛林专属怪物】
+const jungleMobs = {
+    // 小怪
+    snake:     { id:'snake', icon: '🐍', name: '毒牙蛇', hp: 60, maxHp: 60, atk: 10, speed: 9, desc:'隐藏在落叶中的毒蛇，攻击附加持续中毒', special: 'poison' },
+    monkey:    { id:'monkey', icon: '🐒', name: '泼猴', hp: 75, maxHp: 75, atk: 8, speed: 13, desc:'喜欢丢石头的猴子，攻击有几率窃取玩家金币', special: 'steal_gold' },
+    // 精英
+    venom_spider: { id:'venom_spider', icon: '🕷️', name: '瘴蛛女王', hp: 180, maxHp: 180, atk: 17, speed: 7, desc:'巨大的毒蜘蛛，织网降低敌人速度并持续中毒', special: 'web_poison', isElite: true },
+    ancient_golem: { id:'ancient_golem', icon: '🪨', name: '藤甲古傀', hp: 260, maxHp: 260, atk: 14, speed: 3, desc:'被藤蔓缠绕的石像守卫，每回合恢复少量生命', special: 'regen', isElite: true }
+};
+
 // 【特殊道具配置】
 const specialItems = [
     { id:'duck_art', name:'鸭俊板板', isUnique:true, type:'unique', icon:'🦆', desc:'唯一神器：全属性飙升！攻击+30, 生命+100, 吸血+15%, 暴击+10%' },
@@ -36,18 +56,18 @@ const specialItems = [
 
 // 【战斗掉落池】
 const rewardPool = [
-    { id:'r1', isUnique:false, type:'atk', icon:'🗡️', name:'力量涌动', desc:'属性强化: 攻击力+5', exec: () => player.atk+=5 },
-    { id:'r2', isUnique:false, type:'maxHp', icon:'🛡️', name:'体质强化', desc:'属性强化: 最大生命+25', exec: () => { player.maxHp+=25; player.hp+=25;} },
-    { id:'r3', isUnique:false, type:'heal', icon:'❤️', name:'紧急包扎', desc:'补给: 恢复50%生命', exec: () => player.hp = Math.min(player.maxHp, player.hp + player.maxHp*0.5) },
-    { id:'r4', isUnique:false, type:'crit', icon:'💥', name:'弱点识破', desc:'属性强化: 暴击率+4%', exec: () => player.crit=Math.min(70, player.crit+4) },
-    { id:'r5', isUnique:false, type:'dodge', icon:'💨', name:'身轻如燕', desc:'属性强化: 闪避率+2%', exec: () => player.dodge=Math.min(50, player.dodge+2) },
-    { id:'r6', isUnique:false, type:'life', icon:'🦇', name:'嗜血狂热', desc:'属性强化: 吸血+6%', exec: () => player.lifesteal+=6 },
+    { id:'r1', isUnique:true, type:'atk', icon:'🗡️', name:'力量涌动', desc:'唯一道具: 属性强化: 攻击力+5', exec: () => player.atk+=5 },
+    { id:'r2', isUnique:true, type:'maxHp', icon:'🛡️', name:'体质强化', desc:'唯一道具: 属性强化: 最大生命+25', exec: () => { player.maxHp+=25; player.hp+=25;} },
+    { id:'r3', isUnique:true, type:'heal', icon:'❤️', name:'紧急包扎', desc:'唯一道具: 补给: 恢复50%生命', exec: () => player.hp = Math.min(player.maxHp, player.hp + player.maxHp*0.5) },
+    { id:'r4', isUnique:true, type:'crit', icon:'💥', name:'弱点识破', desc:'唯一道具: 属性强化: 暴击率+4%', exec: () => player.crit=Math.min(70, player.crit+4) },
+    { id:'r5', isUnique:true, type:'dodge', icon:'💨', name:'身轻如燕', desc:'唯一道具: 属性强化: 闪避率+2%', exec: () => player.dodge=Math.min(50, player.dodge+2) },
+    { id:'r6', isUnique:true, type:'life', icon:'🦇', name:'嗜血狂热', desc:'唯一道具: 属性强化: 吸血+6%', exec: () => player.lifesteal+=6 },
     { id:'r_torch', isUnique:true, type:'unique', icon:'🔥', name:'火把', desc:'唯一道具：冰原祭坛专用，可以烧毁菇菇祭祀的冰盾来源。', exec: () => {} }
 ];
 
 // 【商店道具池】
 const shopPool = [
-    { id:'s1', isUnique:false, cost: 30, icon:'🍗', name:'烤大腿', desc:'补给: 恢复100%生命', exec: () => player.hp = player.maxHp },
+    { id:'s1', isUnique:true, cost: 30, icon:'🍗', name:'烤大腿', desc:'唯一道具: 补给: 恢复100%生命', exec: () => player.hp = player.maxHp },
     { id:'s2', isUnique:true, type:'unique', cost: 60, icon:'⚔️', name:'陨铁剑', desc:'唯一装备: 攻击力大幅+12', exec: () => player.atk+=12 },
     { id:'s3', isUnique:true, type:'unique', cost: 50, icon:'👟', name:'疾风鞋', desc:'唯一装备: 速度+12，闪避+2%', exec: () => { player.speed+=12; player.dodge=Math.min(50, player.dodge+2); } },
     { id:'s4', isUnique:true, type:'unique', cost: 75, icon:'🩸', name:'吸血镰刀', desc:'唯一装备: 吸血+12%', exec: () => player.lifesteal+=12 },
