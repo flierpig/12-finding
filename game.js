@@ -14,6 +14,14 @@ let erboCurrentRipple = null; // 尔波当前波纹
 let erboUltUnlocked = false; // 尔波奥义是否解锁
 let battleActive = false;
 
+// 新角色和道具状态
+let hasPoem = false; // 诗歌：提升天赋/奥义正向百分比
+let hasRice = false; // 大米：每场战斗后回复15%最大生命
+let hasGrainDisaster = false; // 粮灾：攻击后自扣5%血
+let shujunUltActive = false; // 鼠俊奥义激活
+let xiaonaigouDebuffTotal = 0; // 肖奈沟累计降低敌人攻击力百分比
+let xiaonaigouUltActive = false; // 肖奈沟奥义激活
+
 // 大地图事件进度
 let currentNodeId = 'start';
 let defeatedBosses = [];
@@ -160,6 +168,14 @@ function initGame(playerKey) {
     erboCurrentRipple = null;
     erboUltUnlocked = false;
     player.woodShield = false;
+
+    // 新角色和道具状态初始化
+    hasPoem = false;
+    hasRice = false;
+    hasGrainDisaster = false;
+    shujunUltActive = false;
+    xiaonaigouDebuffTotal = 0;
+    xiaonaigouUltActive = false;
 
     // 初始化镇镇之力
     let zzPool = ['luck', 'crit', 'immortal', 'overload', 'random'];
@@ -341,9 +357,11 @@ function renderGrid() {
                 (Math.abs(r - regionGridPos.r) + Math.abs(c - regionGridPos.c) === 1);
 
             if(!node) {
-                // 空地：不可通行
                 div.classList.add('empty');
                 div.innerText = '';
+            } else if(node.blocked) {
+                div.classList.add('blocked');
+                div.innerText = '🚫';
             } else if(isCurrent) {
                 div.classList.add('current');
                 div.innerText = '📍';
@@ -376,20 +394,23 @@ function renderGrid() {
 function updateGridButtons() {
     let current = getCurrentNode();
     if(!current) return;
-    let hasUp = regionGrid.nodeMap[`${current.r-1},${current.c}`];
-    let hasDown = regionGrid.nodeMap[`${current.r+1},${current.c}`];
-    let hasLeft = regionGrid.nodeMap[`${current.r},${current.c-1}`];
-    let hasRight = regionGrid.nodeMap[`${current.r},${current.c+1}`];
-    document.getElementById('btn-up').disabled = !hasUp;
-    document.getElementById('btn-down').disabled = !hasDown;
-    document.getElementById('btn-left').disabled = !hasLeft;
-    document.getElementById('btn-right').disabled = !hasRight;
+
+    // 检查节点是否存在且有连接
+    let canMoveTo = (targetId) => {
+        let target = regionGrid.nodeMap[targetId];
+        return target && current.connections.includes(targetId);
+    };
+
+    document.getElementById('btn-up').disabled = !canMoveTo(`${current.r-1},${current.c}`);
+    document.getElementById('btn-down').disabled = !canMoveTo(`${current.r+1},${current.c}`);
+    document.getElementById('btn-left').disabled = !canMoveTo(`${current.r},${current.c-1}`);
+    document.getElementById('btn-right').disabled = !canMoveTo(`${current.r},${current.c+1}`);
 }
 
 function gridMove(direction) {
-    if(regionGridInEvent) return;
     let current = getCurrentNode();
     if(!current) return;
+
     let targetId = null;
     if(direction === 'up') targetId = `${current.r-1},${current.c}`;
     if(direction === 'down') targetId = `${current.r+1},${current.c}`;
@@ -397,15 +418,14 @@ function gridMove(direction) {
     if(direction === 'right') targetId = `${current.r},${current.c+1}`;
 
     let target = regionGrid.nodeMap[targetId];
-    if(target) {
-        if(!current.connections.includes(targetId)) {
-            current.connections.push(targetId);
-        }
-        if(!target.connections.includes(current.id)) {
-            target.connections.push(current.id);
-        }
-        regionGridPos = { r: target.r, c: target.c };
+
+    // 检查目标节点是否存在且有连接
+    if(!target || !current.connections.includes(targetId)) {
+        return; // 无法移动
     }
+
+    regionGridPos = { r: target.r, c: target.c };
+    regionGridInEvent = false;
 
     renderGrid();
     updateGridButtons();
@@ -855,6 +875,9 @@ function startCombat() {
     enemy.activeDodgeDance = false; enemy.activeCritDance = false;
     if(enemy) enemy.frozenTurns = 0;
     fushunLastImmuneTurn = -99;
+    shujunUltActive = false;
+    xiaonaigouDebuffTotal = 0;
+    xiaonaigouUltActive = false;
     
     if (hasFushunItem && fushunBattles > 0) { fushunBattles--; if (fushunBattles === 0) fushunPermanent = true; }
 
@@ -1144,7 +1167,15 @@ function processAction(atkChar, defChar) {
                 isCrit = false; fushunLastImmuneTurn = turn; 
             }
         }
-        if(isCrit && damage > 0) { damage = Math.floor(damage * 1.5); log(`<span class="log-dmg">💥 暴击！</span>`); if(isPlayerAtk) pCrits++; }
+        // 鼠俊天赋：暴击窃取敌人生命而非造成额外伤害
+        if(isCrit && isPlayerAtk && player.id === 'shujun') {
+            let stealPct = hasPoem ? 15 : 10;
+            let stealAmount = Math.floor(defChar.maxHp * stealPct / 100);
+            damage += stealAmount;
+            player.hp = Math.min(player.maxHp, player.hp + stealAmount);
+            pCrits++;
+            log(`<span class="log-dmg">🐭 [鼠俊] 暴击窃取！吸取 ${defChar.name} ${stealAmount} 生命（${stealPct}%最大生命）！</span>`);
+        } else if(isCrit && damage > 0) { damage = Math.floor(damage * 1.5); log(`<span class="log-dmg">💥 暴击！</span>`); if(isPlayerAtk) pCrits++; }
     }
 
     // 尔波奥义解锁：玩家暴击后解锁
@@ -1164,6 +1195,7 @@ function processAction(atkChar, defChar) {
         else { 
             let totalDodge = defChar.dodge || 0; 
             if(defChar.id === 'doudouji') totalDodge += 8; // 抖抖鸡基础8%额外闪避
+            if(defChar.id === 'shujun' && shujunUltActive) totalDodge += 50; // 鼠俊奥义闪避+50%
             if(Math.random() * 100 < totalDodge) { isHit = false; if(!isPlayerAtk) pDodges++; } 
         }
     }
@@ -1202,6 +1234,18 @@ function processAction(atkChar, defChar) {
                     collectRipple();
                 }
             }
+
+            // 肖奈沟天赋：受到伤害时，敌人概率降低攻击力
+            if(!isPlayerAtk && player.id === 'xiaonaigou') {
+                let debuffChance = hasPoem ? 55 : 50;
+                let debuffPct = hasPoem ? 7 : 5;
+                if(Math.random() * 100 < debuffChance) {
+                    xiaonaigouDebuffTotal += debuffPct;
+                    let actualDebuff = Math.floor(atkChar.atk * debuffPct / 100);
+                    atkChar.atk = Math.max(1, atkChar.atk - actualDebuff);
+                    log(`<span class="log-skill">🐱 [肖奈沟] 敌人的攻击被削弱了 ${debuffPct}%！累计削弱 ${xiaonaigouDebuffTotal}%</span>`);
+                }
+            }
             let lifestealPct = atkChar.lifesteal || 0; if(atkChar.id === 'final') lifestealPct += 30;
             if(lifestealPct > 0) { let heal = Math.floor(damage * lifestealPct / 100); atkChar.hp = Math.min(atkChar.maxHp, atkChar.hp + heal); }
             if(atkChar.id === 'snake') defChar.poison += Math.floor(atkChar.atk * 0.4);
@@ -1214,6 +1258,15 @@ function processAction(atkChar, defChar) {
                     let burn = Math.floor(damage * 0.2);
                     defChar.hp -= burn;
                     log(`<span class="log-atk">🔥 [火把灼烧] 敌人被火焰灼烧，额外受到 ${burn} 点伤害！</span>`);
+                }
+            }
+
+            // 粮灾：攻击后扣除自身5%生命（低于30%不扣）
+            if(isPlayerAtk && hasGrainDisaster) {
+                if(player.hp > player.maxHp * 0.3) {
+                    let selfDmg = Math.floor(player.maxHp * 0.05);
+                    player.hp = Math.max(1, player.hp - selfDmg);
+                    log(`<span class="log-atk">🌾 [粮灾] 攻击反噬，扣除自身 ${selfDmg} 生命！</span>`);
                 }
             }
 
@@ -1275,6 +1328,13 @@ function processAction(atkChar, defChar) {
 
         } else if (!isHit) {
             log(`${defChar.name} 闪避了攻击！💨`);
+            // 鼠俊奥义：闪避成功后回复血量
+            if(defChar.id === 'shujun' && shujunUltActive) {
+                let healPct = hasPoem ? 15 : 10;
+                let healAmount = Math.floor(defChar.maxHp * healPct / 100);
+                defChar.hp = Math.min(defChar.maxHp, defChar.hp + healAmount);
+                log(`<span class="log-heal">🐭 [鼠俊奥义] 闪避成功！回复 ${healAmount} 生命（${healPct}%最大生命）！</span>`);
+            }
             // 菇菇之力：闪避成功后提升速度
             if(isPlayerAtk && ownedItems.some(it => it.id === 'mushroom_power')) {
                 player.speed += 1;
@@ -1376,6 +1436,12 @@ function checkUltReady() {
     if(c === 'erbo') {
         // 尔波：暴击解锁，有波纹就能用，无次数限制
         if(erboUltUnlocked && erboCurrentRipple) ready = true;
+    } else if(c === 'shujun') {
+        // 鼠俊：生命低于50%可使用
+        if(ultUsesLeft > 0 && player.hp < player.maxHp * 0.5 && !shujunUltActive) ready = true;
+    } else if(c === 'xiaonaigou') {
+        // 肖奈沟：累计降低敌人攻击≥10%可触发
+        if(ultUsesLeft > 0 && xiaonaigouDebuffTotal >= 10 && !xiaonaigouUltActive) ready = true;
     } else if(ultUsesLeft > 0) {
         if(c === 'soso5') {
             if(sosoUltCooldown <= 0) ready = true;
@@ -1396,6 +1462,13 @@ function checkUltReady() {
             if(!erboUltUnlocked) btn.innerText = "终结技：需要暴击解锁";
             else if(!erboCurrentRipple) btn.innerText = "终结技：无波纹可用";
             else btn.innerText = "终结技：条件未达成";
+        } else if(c === 'shujun') {
+            if(shujunUltActive) btn.innerText = "终结技：已激活";
+            else if(player.hp >= player.maxHp * 0.5) btn.innerText = "终结技：生命需低于50%";
+            else btn.innerText = "终结技：条件未达成";
+        } else if(c === 'xiaonaigou') {
+            if(xiaonaigouUltActive) btn.innerText = "终结技：已激活";
+            else btn.innerText = `终结技：削弱进度 ${xiaonaigouDebuffTotal}%/10%`;
         } else {
             btn.innerText = `终结技：条件未达成${cooldown}`;
         }
@@ -1419,6 +1492,8 @@ function castUltimate() {
     // 其他角色：需要次数限制
     if(ultUsesLeft <= 0) return;
     if(c === 'soso5' && sosoUltCooldown > 0) return;
+    if(c === 'shujun' && (player.hp >= player.maxHp * 0.5 || shujunUltActive)) return;
+    if(c === 'xiaonaigou' && (xiaonaigouDebuffTotal < 10 || xiaonaigouUltActive)) return;
 
     ultUsesLeft--;
     let btn = document.getElementById('ult-btn');
@@ -1463,6 +1538,16 @@ function castUltimate() {
                 log(`<span class="log-ult">🐔 [抖抖鸡奥义] 闪避失败，额外闪避率+5%！</span>`);
             }
         }
+    }
+    else if(c === 'shujun') {
+        shujunUltActive = true;
+        log(`<span class="log-ult">🐭 [鼠俊奥义] 极限闪避！本场战斗闪避率+50%，每次闪避成功回复10%最大生命！</span>`);
+    }
+    else if(c === 'xiaonaigou') {
+        xiaonaigouUltActive = true;
+        let atkBonus = Math.floor(player.atk * xiaonaigouDebuffTotal / 100);
+        player.atk += atkBonus;
+        log(`<span class="log-ult">🐱 [肖奈沟奥义] 反击之力！敌人已削弱 ${xiaonaigouDebuffTotal}%，自身攻击力提升 ${atkBonus}！</span>`);
     }
     
     if(hasSosoUltItem) { log(`<span class="log-collab-soso">💿 [联动道具] 奥义附带尬舞！</span>`); triggerSosoDance(player); }
@@ -1554,6 +1639,13 @@ function endCombat() {
 
     let dropGold = (isGridBoss || (currentNode && currentNode.type === 'boss')) ? Math.floor(Math.random()*30+60) : Math.floor(Math.random()*15 + 15);
     gold += dropGold; updateTopBar();
+
+    // 大米：每场战斗后回复15%最大生命
+    if(hasRice) {
+        let riceHeal = Math.floor(player.maxHp * 0.15);
+        player.hp = Math.min(player.maxHp, player.hp + riceHeal);
+        log(`<span class="log-heal">🍚 [大米] 战斗后回复 ${riceHeal} 生命！</span>`);
+    }
 
     // 祭坛进度系统
     let hasAltar = ownedItems.some(it => it.id === 'altar' || it.id === 'r_altar' || it.id === 's_altar');

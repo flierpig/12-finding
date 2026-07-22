@@ -3,7 +3,9 @@ const baseCharData = {
     soso5: { id:'soso5', icon:'🕺', name:'soso5网格', badge: 'badge-soso', badgeTxt: 'soso联动', hp:135, maxHp:135, atk:13, speed:12, crit:0, lifesteal:0, dodge:0, desc:'【天赋】每3回合并发随机舞蹈(闪避/暴击/回血/SOSO5)，SOSO5概率5%，其他三个平分剩余概率。', ultDesc:'【终结】无使用条件，每两回合可用一次。血高于敌造成差值伤害，低于敌则回复差值血量并触发SOSO5！' },
     zhouge: { id:'zhouge', icon:'🍔', name:'快餐侠洲歌', badge: 'badge-ff', badgeTxt: '快餐联动', hp:180, maxHp:180, atk:10, speed:8, crit:0, lifesteal:0, dodge:0, desc:'【天赋】每回合随机扣自己或对方5%血，扣自己概率30%。若被自己扣死则保留1血并造成自身生命上限伤害。', ultDesc:'【终结】被天赋扣血后可触发：恢复所有血量，后续只扣对方的血！' },
     doudouji: { id:'doudouji', icon:'🐔', name:'抖抖鸡', hp:105, maxHp:105, atk:12, speed:14, crit:0, lifesteal:0, dodge:8, desc:'【天赋】一直发抖，每回合额外进行一次闪避判定。每次闪避成功攻击+1。', ultDesc:'【终结】通过成功额外闪避触发：本次战斗闪避率+20%，之后每闪避失败一次再+5%！' },
-    erbo: { id:'erbo', icon:'🌊', name:'尔波', hp:140, maxHp:140, atk:11, speed:11, crit:5, lifesteal:0, dodge:0, desc:'【天赋】无波纹时，受三次伤害可收集随机波纹。六种波纹：连续攻击/吸血/灼烧/反伤/加攻/降敌攻。', ultDesc:'【终结】暴击后解锁，无次数限制。使用时消耗当前波纹并释放其效果！' }
+    erbo: { id:'erbo', icon:'🌊', name:'尔波', hp:140, maxHp:140, atk:11, speed:11, crit:5, lifesteal:0, dodge:0, desc:'【天赋】无波纹时，受三次伤害可收集随机波纹。六种波纹：连续攻击/吸血/灼烧/反伤/加攻/降敌攻。', ultDesc:'【终结】暴击后解锁，无次数限制。使用时消耗当前波纹并释放其效果！' },
+    shujun: { id:'shujun', icon:'🐭', name:'鼠俊', hp:130, maxHp:130, atk:10, speed:10, crit:10, lifesteal:0, dodge:0, desc:'【天赋】暴击不再造成额外伤害，而是改为窃取对方10%最大生命值。', ultDesc:'【终结】生命低于50%可使用：本场战斗闪避+50%，闪避后回复自身10%最大生命！' },
+    xiaonaigou: { id:'xiaonaigou', icon:'🐱', name:'肖奈沟', hp:150, maxHp:150, atk:8, speed:9, crit:0, lifesteal:0, dodge:0, desc:'【天赋】每受到一次伤害，敌人有50%概率降低5%攻击力（可叠加）。', ultDesc:'【终结】天赋累计降低敌人攻击≥10%时可触发：自身攻击力提升敌人已降低的攻击力百分比！' }
 };
 
 // 【敌方图鉴】
@@ -82,7 +84,10 @@ const rewardPool = [
     { id:'r7', isUnique:true, type:'speed', icon:'⚡', name:'疾风步', desc:'唯一道具: 属性强化: 速度+3', exec: () => player.speed+=3 },
     { id:'r8', isUnique:true, type:'heal', icon:'🍎', name:'生命果实', desc:'唯一道具: 补给: 恢复30生命', exec: () => player.hp = Math.min(player.maxHp, player.hp + 30) },
     { id:'r9', isUnique:true, type:'gold', icon:'💰', name:'金币袋', desc:'唯一道具: 获得30金币', exec: () => gold += 30 },
-    { id:'r10', isUnique:true, type:'shield', icon:'🛡️', name:'护盾符文', desc:'唯一道具: 下次受到的伤害降低50%', exec: () => player.damageReduction = 0.5 }
+    { id:'r10', isUnique:true, type:'shield', icon:'🛡️', name:'护盾符文', desc:'唯一道具: 下次受到的伤害降低50%', exec: () => player.damageReduction = 0.5 },
+    { id:'r11', isUnique:true, type:'unique', icon:'📜', name:'诗歌', desc:'唯一道具: 提升天赋或奥义中正向百分比描述的数值', exec: () => { hasPoem = true; } },
+    { id:'r12', isUnique:true, type:'heal', icon:'🍚', name:'大米', desc:'唯一道具: 每场战斗后回复15%最大生命', exec: () => { hasRice = true; } },
+    { id:'r13', isUnique:true, type:'atk', icon:'🌾', name:'粮灾', desc:'唯一道具: 攻击力+20，攻击后扣除自身5%生命（生命低于30%不扣）', exec: () => { player.atk += 20; hasGrainDisaster = true; } }
 ];
 
 // 【商店道具池】
@@ -99,7 +104,10 @@ const shopPool = [
     { id:'s7', isUnique:true, type:'unique', cost: 40, icon:'📿', name:'守护项链', desc:'唯一装备: 闪避率+5%', exec: () => player.dodge=Math.min(50, player.dodge+5) },
     { id:'s8', isUnique:true, type:'unique', cost: 55, icon:'🔥', name:'火焰戒指', desc:'唯一装备: 攻击有10%概率造成灼烧', exec: () => player.burnChance = 0.1 },
     { id:'s9', isUnique:true, type:'unique', cost: 35, icon:'🌊', name:'潮汐护符', desc:'唯一装备: 生命低于30%时恢复15%生命', exec: () => player.lowHpHeal = 0.15 },
-    { id:'s10', isUnique:true, type:'unique', cost: 65, icon:'💀', name:'死神镰刀', desc:'唯一装备: 击杀敌人后恢复10%生命', exec: () => player.killHeal = 0.1 }
+    { id:'s10', isUnique:true, type:'unique', cost: 65, icon:'💀', name:'死神镰刀', desc:'唯一装备: 击杀敌人后恢复10%生命', exec: () => player.killHeal = 0.1 },
+    { id:'s11', isUnique:true, type:'unique', cost: 50, icon:'📜', name:'诗歌', desc:'唯一道具: 提升天赋或奥义中正向百分比描述的数值', exec: () => { hasPoem = true; } },
+    { id:'s12', isUnique:true, type:'heal', cost: 35, icon:'🍚', name:'大米', desc:'唯一道具: 每场战斗后回复15%最大生命', exec: () => { hasRice = true; } },
+    { id:'s13', isUnique:true, type:'atk', cost: 55, icon:'🌾', name:'粮灾', desc:'唯一道具: 攻击力+20，攻击后扣除自身5%生命（生命低于30%不扣）', exec: () => { player.atk += 20; hasGrainDisaster = true; } }
 ];
 
 // 【镇镇之力数据】

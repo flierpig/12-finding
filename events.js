@@ -958,54 +958,120 @@ const jungleBossEvent = {
 // 支持冰原/海岸/丛林三种区域，通过参数传入不同的事件池和Boss事件
 // 规则：事件不重复（除了combat_random）、商店最多2个、精英怪节点唯一
 function generateRegionGrid(eventPool, bossEvent, regionId) {
-    let width = 6 + Math.floor(Math.random() * 3);
-    let height = 6 + Math.floor(Math.random() * 4);
+    let width = 5 + Math.floor(Math.random() * 2);  // 5-6
+    let height = 5 + Math.floor(Math.random() * 2); // 5-6
     let nodes = [];
     let nodeMap = {};
 
-    for(let r = 0; r < height; r++) {
-        for(let c = 0; c < width; c++) {
-            let isEdge = (r === 0 || c === 0 || r === height-1 || c === width-1);
-            let isStartOrBoss = (r === 0 && c === 0) || (r === height-1 && c === width-1);
-            let density = isStartOrBoss ? 1 : (isEdge ? 0.85 : 0.55);
-            if(Math.random() < density) {
-                let node = {
-                    id: `${r},${c}`, r: r, c: c,
-                    type: 'event', visited: false, event: null, connections: [], x: c, y: r
-                };
-                nodes.push(node);
-                nodeMap[node.id] = node;
-            }
-        }
-    }
+    // 1. 先生成一条从起点到Boss的主路径（确保一定有路可走）
+    let path = generateMainPath(width, height);
 
-    let startNode = nodeMap['0,0'] || createNodeAt(0, 0, nodes, nodeMap, width, height);
+    // 2. 创建主路径上的所有节点
+    path.forEach((pos, index) => {
+        let node = {
+            id: `${pos.r},${pos.c}`, r: pos.r, c: pos.c,
+            type: 'event', visited: false, event: null, connections: [], x: pos.c, y: pos.r,
+            isMainPath: true
+        };
+        nodes.push(node);
+        nodeMap[node.id] = node;
+    });
+
+    // 设置起点和Boss节点
+    let startNode = nodeMap['0,0'];
     startNode.type = 'start';
     startNode.visited = true;
 
     let bossR = height - 1, bossC = width - 1;
-    let bossNode = nodeMap[`${bossR},${bossC}`] || createNodeAt(bossR, bossC, nodes, nodeMap, width, height);
+    let bossNode = nodeMap[`${bossR},${bossC}`];
     bossNode.type = 'boss';
     bossNode.event = bossEvent;
 
-    ensureMainPath(startNode, bossNode, nodes, nodeMap, width, height);
+    // 3. 建立主路径上的连接
+    for(let i = 0; i < path.length - 1; i++) {
+        let current = path[i];
+        let next = path[i + 1];
+        let currentId = `${current.r},${current.c}`;
+        let nextId = `${next.r},${next.c}`;
+        if(!nodeMap[currentId].connections.includes(nextId)) {
+            nodeMap[currentId].connections.push(nextId);
+        }
+        if(!nodeMap[nextId].connections.includes(currentId)) {
+            nodeMap[nextId].connections.push(currentId);
+        }
+    }
 
+    // 4. 添加一些分支节点（只添加到已有节点的相邻位置，确保连通）
     let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-    nodes.forEach(node => {
+    let maxBranchNodes = Math.floor(nodes.length * 0.4); // 限制分支节点数量
+    let branchCount = 0;
+
+    // 随机选择主路径节点生成分支
+    let mainPathNodes = nodes.filter(n => n.isMainPath);
+    mainPathNodes.forEach(node => {
+        if(branchCount >= maxBranchNodes) return;
+
         dirs.forEach(d => {
+            if(branchCount >= maxBranchNodes) return;
+
             let nr = node.r + d[0], nc = node.c + d[1];
             let key = `${nr},${nc}`;
-            if(nodeMap[key]) {
-                let hasConnection = node.connections.includes(key) && nodeMap[key].connections.includes(node.id);
-                if(!hasConnection && Math.random() < 0.65) {
-                    if(!node.connections.includes(key)) node.connections.push(key);
-                    if(!nodeMap[key].connections.includes(node.id)) nodeMap[key].connections.push(node.id);
-                }
+
+            // 边界检查
+            if(nr < 0 || nc < 0 || nr >= height || nc >= width) return;
+            // 如果已存在则跳过
+            if(nodeMap[key]) return;
+            // 25%概率生成分支节点
+            if(Math.random() < 0.25) {
+                let newNode = {
+                    id: key, r: nr, c: nc,
+                    type: 'event', visited: false, event: null, connections: [], x: nc, y: nr,
+                    isMainPath: false
+                };
+                nodes.push(newNode);
+                nodeMap[key] = newNode;
+                branchCount++;
+
+                // 建立双向连接（只连接到主路径节点，确保连通）
+                if(!node.connections.includes(key)) node.connections.push(key);
+                if(!newNode.connections.includes(node.id)) newNode.connections.push(node.id);
             }
         });
     });
 
-    ensureAllConnected(nodes, nodeMap, startNode, width, height);
+    // 5. 确保所有节点都有双向连接
+    nodes.forEach(node => {
+        node.connections.forEach(connId => {
+            let connNode = nodeMap[connId];
+            if(connNode && !connNode.connections.includes(node.id)) {
+                connNode.connections.push(node.id);
+            }
+        });
+    });
+
+    // 6. 验证所有节点都从起点可达（BFS检测）
+    let reachable = new Set();
+    let queue = ['0,0'];
+    reachable.add('0,0');
+
+    while(queue.length > 0) {
+        let currentId = queue.shift();
+        let current = nodeMap[currentId];
+        if(!current) continue;
+
+        current.connections.forEach(connId => {
+            if(!reachable.has(connId) && nodeMap[connId]) {
+                reachable.add(connId);
+                queue.push(connId);
+            }
+        });
+    }
+
+    // 移除无法到达的节点
+    nodes = nodes.filter(n => reachable.has(n.id));
+    Object.keys(nodeMap).forEach(key => {
+        if(!reachable.has(key)) delete nodeMap[key];
+    });
 
     assignEventsToNodes(nodes, eventPool, regionId);
 
@@ -1013,6 +1079,36 @@ function generateRegionGrid(eventPool, bossEvent, regionId) {
         width: width, height: height, nodes: nodes, nodeMap: nodeMap,
         startNode: startNode, bossNode: bossNode, currentNodeId: startNode.id, regionId: regionId
     };
+}
+
+// 生成从(0,0)到(height-1, width-1)的主路径
+function generateMainPath(width, height) {
+    let path = [{r: 0, c: 0}];
+    let current = {r: 0, c: 0};
+    let target = {r: height - 1, c: width - 1};
+
+    while(current.r !== target.r || current.c !== target.c) {
+        let moves = [];
+
+        // 优先向目标方向移动，但加入随机性
+        if(current.r < target.r) moves.push({r: current.r + 1, c: current.c});
+        if(current.c < target.c) moves.push({r: current.r, c: current.c + 1});
+        if(current.r > target.r) moves.push({r: current.r - 1, c: current.c});
+        if(current.c > target.c) moves.push({r: current.r, c: current.c - 1});
+
+        // 如果没有可选的移动（理论上不会发生），就随机选一个方向
+        if(moves.length === 0) {
+            if(current.r < height - 1) moves.push({r: current.r + 1, c: current.c});
+            else moves.push({r: current.r, c: current.c + 1});
+        }
+
+        // 随机选择一个移动
+        let move = moves[Math.floor(Math.random() * moves.length)];
+        current = move;
+        path.push({...current});
+    }
+
+    return path;
 }
 
 // 分配事件到节点，遵循规则
@@ -1097,133 +1193,4 @@ function generateSnowGrid() {
     return generateRegionGrid(snowEvents, snowBossEvent, 'snow');
 }
 
-function createNodeAt(r, c, nodes, nodeMap, width, height) {
-    let node = { id: `${r},${c}`, r: r, c: c, type: 'event', visited: false, event: null, connections: [], x: c, y: r };
-    nodes.push(node);
-    nodeMap[node.id] = node;
-    return node;
-}
 
-function ensureMainPath(startNode, bossNode, nodes, nodeMap, width, height) {
-    let current = startNode;
-    let targetR = bossNode.r;
-    let targetC = bossNode.c;
-
-    while(current.id !== bossNode.id) {
-        let nextR = current.r;
-        let nextC = current.c;
-
-        if(current.r < targetR) nextR++;
-        else if(current.r > targetR) nextR--;
-
-        if(current.c < targetC) nextC++;
-        else if(current.c > targetC) nextC--;
-
-        let nextKey = `${nextR},${nextC}`;
-        let nextNode = nodeMap[nextKey];
-
-        if(!nextNode) {
-            nextNode = createNodeAt(nextR, nextC, nodes, nodeMap, width, height);
-        }
-
-        if(!current.connections.includes(nextNode.id)) {
-            current.connections.push(nextNode.id);
-        }
-        if(!nextNode.connections.includes(current.id)) {
-            nextNode.connections.push(current.id);
-        }
-
-        current = nextNode;
-    }
-}
-
-function ensureAllConnected(nodes, nodeMap, startNode, width, height) {
-    if(nodes.length === 0) return;
-
-    let visited = new Set();
-    let queue = [startNode.id];
-    visited.add(startNode.id);
-
-    while(queue.length > 0) {
-        let cur = nodeMap[queue.shift()];
-        cur.connections.forEach(nextId => {
-            if(!visited.has(nextId)) {
-                visited.add(nextId);
-                queue.push(nextId);
-            }
-        });
-    }
-
-    let isolated = nodes.filter(n => !visited.has(n.id));
-    let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-
-    isolated.forEach(node => {
-        let bestPath = null;
-        let minDist = Infinity;
-
-        for(let d of dirs) {
-            let nr = node.r + d[0], nc = node.c + d[1];
-            let key = `${nr},${nc}`;
-            if(nodeMap[key] && visited.has(key)) {
-                minDist = 1;
-                bestPath = nodeMap[key];
-                break;
-            }
-        }
-
-        if(!bestPath) {
-            nodes.forEach(other => {
-                if(visited.has(other.id)) {
-                    let dist = Math.abs(node.r - other.r) + Math.abs(node.c - other.c);
-                    if(dist < minDist) {
-                        minDist = dist;
-                        bestPath = other;
-                    }
-                }
-            });
-        }
-
-        if(bestPath) {
-            if(Math.abs(node.r - bestPath.r) + Math.abs(node.c - bestPath.c) === 1) {
-                if(!node.connections.includes(bestPath.id)) node.connections.push(bestPath.id);
-                if(!bestPath.connections.includes(node.id)) bestPath.connections.push(node.id);
-                visited.add(node.id);
-            } else {
-                let cr = bestPath.r;
-                let cc = bestPath.c;
-                let prev = bestPath;
-
-                while(cc !== node.c) {
-                    cc += Math.sign(node.c - cc);
-                    let key = `${cr},${cc}`;
-                    if(!nodeMap[key]) {
-                        nodeMap[key] = createNodeAt(cr, cc, nodes, nodeMap, width, height);
-                    }
-                    if(!prev.connections.includes(key)) prev.connections.push(key);
-                    if(!nodeMap[key].connections.includes(prev.id)) nodeMap[key].connections.push(prev.id);
-                    visited.add(key);
-                    prev = nodeMap[key];
-                }
-
-                while(cr !== node.r) {
-                    cr += Math.sign(node.r - cr);
-                    let key = `${cr},${cc}`;
-                    if(!nodeMap[key]) {
-                        nodeMap[key] = createNodeAt(cr, cc, nodes, nodeMap, width, height);
-                    }
-                    if(!prev.connections.includes(key)) prev.connections.push(key);
-                    if(!nodeMap[key].connections.includes(prev.id)) nodeMap[key].connections.push(prev.id);
-                    visited.add(key);
-                    prev = nodeMap[key];
-                }
-
-                visited.add(node.id);
-            }
-        }
-    });
-
-    let allVisited = nodes.every(n => visited.has(n.id));
-    if(!allVisited) {
-        ensureAllConnected(nodes, nodeMap, startNode, width, height);
-    }
-}
