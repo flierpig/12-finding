@@ -240,7 +240,7 @@ function enterNode(nodeId) {
     zhenZhenUsedThisFloor = false;
 
     // 区域地图：进入网格模式（冰原/海岸/丛林）
-    if(nodeId === 'snow_start' || nodeId === 'coast_start' || nodeId === 'jungle_start') {
+    if(nodeId === 'snow_start' || nodeId === 'coast_start' || nodeId === 'jungle_start' || nodeId === 'rat_start') {
         enterRegionMap(nodeId);
         return;
     }
