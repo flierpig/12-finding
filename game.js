@@ -22,6 +22,11 @@ let shujunUltActive = false; // 鼠俊奥义激活
 let xiaonaigouDebuffTotal = 0; // 肖奈沟累计降低敌人攻击力百分比
 let xiaonaigouUltActive = false; // 肖奈沟奥义激活
 
+// 鼠群变身机制
+let ratSwarmTransformed = false; // 是否已变身为鼠群
+let ratOriginalPlayer = null; // 变身前的原始角色数据
+let ratMovesWithoutCombat = 0; // 鼠群模式下连续未战斗的移动次数
+
 // 大地图事件进度
 let currentNodeId = 'start';
 let defeatedBosses = [];
@@ -177,6 +182,11 @@ function initGame(playerKey) {
     xiaonaigouDebuffTotal = 0;
     xiaonaigouUltActive = false;
 
+    // 鼠群变身初始化
+    ratSwarmTransformed = false;
+    ratOriginalPlayer = null;
+    ratMovesWithoutCombat = 0;
+
     // 初始化镇镇之力
     let zzPool = ['luck', 'crit', 'immortal', 'overload', 'random'];
     currentZhenZhen = zzPool[Math.floor(Math.random() * zzPool.length)];
@@ -209,7 +219,7 @@ function updateTopBar() {
     let regionNames = { snow: '永冻雪地', coast: '风暴海岸', jungle: '瘴气丛林' };
     let locName = currentNode ? currentNode.name : (regionGrid ? regionNames[currentRegion] || '未知之地' : '未知之地');
     document.getElementById('ui-location').innerText = locName;
-    document.getElementById('ui-bosses').innerText = `${defeatedBosses.length}/3`;
+    document.getElementById('ui-bosses').innerText = `${defeatedBosses.length}/4`;
     document.getElementById('ui-hp').innerText = `${Math.floor(player.hp)}/${player.maxHp}`;
     document.getElementById('ui-atk').innerText = player.atk;
     document.getElementById('ui-spd').innerText = player.speed;
@@ -306,7 +316,8 @@ function resolveEventOption(result) {
 const regionMetaGrid = {
     snow_start:  { title: '❄️ 永冻雪地', eventPool: snowEvents,     bossEvent: snowBossEvent,     region: 'snow' },
     coast_start: { title: '🌊 风暴海岸', eventPool: coastEvents,    bossEvent: coastBossEvent,    region: 'coast' },
-    jungle_start:{ title: '🌿 瘴气丛林', eventPool: jungleEvents,   bossEvent: jungleBossEvent,   region: 'jungle' }
+    jungle_start:{ title: '🌿 瘴气丛林', eventPool: jungleEvents,   bossEvent: jungleBossEvent,   region: 'jungle' },
+    rat_start:   { title: '🐀 鼠鼠家园', eventPool: ratEvents,      bossEvent: ratBossEvent,      region: 'rat' }
 };
 
 function enterRegionMap(nodeId) {
@@ -427,6 +438,18 @@ function gridMove(direction) {
     regionGridPos = { r: target.r, c: target.c };
     regionGridInEvent = false;
 
+    // 鼠群变身：计数连续未战斗移动
+    if(ratSwarmTransformed) {
+        ratMovesWithoutCombat++;
+        if(ratMovesWithoutCombat > 3) {
+            let penalty = Math.floor(player.maxHp * 0.1);
+            player.hp = Math.max(1, player.hp - penalty);
+            updateTopBar();
+            let panel = document.getElementById('grid-event-panel');
+            panel.innerHTML = `<p style="color:var(--atk);">🐀 [鼠群] 你已连续 ${ratMovesWithoutCombat} 次移动未战斗，饥饿侵蚀了你，扣除 ${penalty} 生命！</p>`;
+        }
+    }
+
     renderGrid();
     updateGridButtons();
 
@@ -517,7 +540,8 @@ function resolveSnowEventOption(result) {
             let pools = {
                 snow: ['ice_block', 'cold_jun', 'gugugaga', 'frost_wolf', 'ice_imp'],
                 coast: ['crab', 'seagull', 'sea_serpent', 'sand_worm'],
-                jungle: ['snake', 'monkey', 'frog', 'mantis']
+                jungle: ['snake', 'monkey', 'frog', 'mantis'],
+                rat: ['rat_scout', 'rat_warrior', 'rat_plague', 'rat_king', 'rat_giant']
             };
             let pool = pools[currentRegion] || pools.snow;
             mobId = pool[Math.floor(Math.random() * pool.length)];
@@ -686,6 +710,53 @@ function handleCustomEvent(action, panel) {
             renderGrid();
             break;
         }
+        // ==================== 鼠鼠家园事件 ====================
+        case 'rat_ignore': {
+            // 放任鼠群：随机扣除血量，极低概率无影响
+            if(Math.random() < 0.05) {
+                panel.innerHTML = '<p style="color:var(--heal);">🐀 鼠群从你身边狂奔而过，竟然完全没有注意到你！</p>';
+            } else {
+                let pct = Math.random() * 0.4 + 0.1; // 10%~50%
+                let dmg = Math.floor(player.hp * pct);
+                player.hp = Math.max(1, player.hp - dmg);
+                panel.innerHTML = `<p style="color:var(--atk);">🐀 鼠群疯狂啃咬你，损失 ${dmg} 生命（${Math.floor(pct*100)}%）！</p>`;
+            }
+            regionGridInEvent = false;
+            updateTopBar();
+            renderGrid();
+            break;
+        }
+        case 'rat_become': {
+            // 成为鼠群：角色替换为鼠群
+            if(!ratSwarmTransformed) {
+                ratOriginalPlayer = {
+                    id: player.id, name: player.name, icon: player.icon,
+                    hp: player.hp, maxHp: player.maxHp,
+                    atk: player.atk, speed: player.speed,
+                    crit: player.crit, lifesteal: player.lifesteal, dodge: player.dodge
+                };
+                // 应用鼠群属性
+                player.id = ratSwarmChar.id;
+                player.name = ratSwarmChar.name;
+                player.icon = ratSwarmChar.icon;
+                player.maxHp = ratSwarmChar.maxHp;
+                player.hp = ratSwarmChar.maxHp;
+                player.atk = ratSwarmChar.atk;
+                player.speed = ratSwarmChar.speed;
+                player.crit = ratSwarmChar.crit;
+                player.lifesteal = ratSwarmChar.lifesteal;
+                player.dodge = ratSwarmChar.dodge;
+                ratSwarmTransformed = true;
+                ratMovesWithoutCombat = 0;
+                panel.innerHTML = '<p style="color:var(--heal);">🐀 你加入了鼠群！在饥荒年代中，你成为了鼠群的一员。生命值已回满，但连续3次移动不战斗将开始扣除生命。</p>';
+            } else {
+                panel.innerHTML = '<p style="color:#94a3b8;">你已经是鼠群的一员了。</p>';
+            }
+            regionGridInEvent = false;
+            updateTopBar();
+            renderGrid();
+            break;
+        }
         default:
             panel.innerHTML = '<p style="color:#94a3b8;">什么都没发生。</p>';
             regionGridInEvent = false;
@@ -697,7 +768,7 @@ function prepareRegionMob(mobId) {
     let scale = getDifficultyScale();
     duckJunDefeatedThisRound = false;
     // 根据当前区域选择怪物池
-    let mobPool = { snow: snowMobs, coast: coastMobs, jungle: jungleMobs };
+    let mobPool = { snow: snowMobs, coast: coastMobs, jungle: jungleMobs, rat: ratMobs };
     let pool = mobPool[currentRegion] || snowMobs;
     let mob = pool[mobId];
     if(!mob) { prepareEnemyForNode({}); return; }
@@ -742,6 +813,8 @@ function prepareRegionBoss(mode) {
         prepareCoastBoss(mode, scale);
     } else if(currentRegion === 'jungle') {
         prepareJungleBoss(mode, scale);
+    } else if(currentRegion === 'rat') {
+        prepareRatBoss(mode, scale);
     } else {
         prepareSnowBoss(mode, scale);
     }
@@ -781,6 +854,42 @@ function prepareJungleBoss(mode, scale) {
     log(`<span class="log-boss">👑👑👑 [Boss战开始] ${enemy.name} 从古树中苏醒！</span>`);
     if(isRoots) log(`<span class="log-boss-warning">⚠️ 你切断了它的根系！古树狂暴了，但奖励更丰厚！</span>`);
     if(isFire) log(`<span class="log-boss">🔥 火焰烧伤了古树，它的再生能力被削弱了！</span>`);
+}
+
+function prepareRatBoss(mode, scale) {
+    let isFire = (mode === 'fire');
+    let isStealth = (mode === 'stealth');
+    enemy = {
+        id: 'famine_era', icon: '💀', name: '饥荒年代',
+        hp: 800, maxHp: 800, atk: 28, speed: 10, crit: 0, lifesteal: 0, dodge: 0,
+        isRatBoss: true, bossMode: mode,
+        stolenItems: [], // 被夺走的道具
+        rewardTier: isStealth ? 3 : (isFire ? 2 : 1)
+    };
+    enemy.maxHp = Math.floor(enemy.maxHp * scale * 1.4); enemy.hp = enemy.maxHp;
+    enemy.atk = Math.floor(enemy.atk * scale * 1.2);
+    if(isStealth) { enemy.maxHp = Math.floor(enemy.maxHp * 1.3); enemy.hp = enemy.maxHp; enemy.atk = Math.floor(enemy.atk * 1.3); }
+
+    // 饥荒年代天赋：剥夺所有非特殊道具
+    let stolenIds = [];
+    ownedItems = ownedItems.filter(item => {
+        let isSpecial = specialItems.some(s => s.id === item.id);
+        if(!isSpecial) {
+            enemy.stolenItems.push(item);
+            stolenIds.push(item.name);
+            return false;
+        }
+        return true;
+    });
+
+    log(`<span class="log-boss">👑👑👑 [Boss战开始] ${enemy.name} 从饥荒深渊中现身！</span>`);
+    if(stolenIds.length > 0) {
+        log(`<span class="log-boss-warning">💀 饥荒年代剥夺了你的道具：${stolenIds.join('、')}！每次受到伤害将随机返还一件。</span>`);
+    } else {
+        log(`<span class="log-boss">💀 饥荒年代没有可掠夺的道具，直接开战！</span>`);
+    }
+    if(isFire) log(`<span class="log-boss">🔥 点燃粮仓！饥荒年代的贪婪被火焰削弱。</span>`);
+    if(isStealth) log(`<span class="log-boss-warning">⚠️ 潜入破坏！饥荒年代更加狂暴，但奖励更丰厚！</span>`);
 }
 
 function prepareSnowBoss(mode, scale) {
@@ -878,6 +987,7 @@ function startCombat() {
     shujunUltActive = false;
     xiaonaigouDebuffTotal = 0;
     xiaonaigouUltActive = false;
+    ratMovesWithoutCombat = 0; // 鼠群移动计数重置
     
     if (hasFushunItem && fushunBattles > 0) { fushunBattles--; if (fushunBattles === 0) fushunPermanent = true; }
 
@@ -1270,6 +1380,15 @@ function processAction(atkChar, defChar) {
                 }
             }
 
+            // 饥荒年代：受到伤害时随机返还一件道具
+            if(isPlayerAtk && enemy && enemy.isRatBoss && enemy.stolenItems && enemy.stolenItems.length > 0) {
+                let idx = Math.floor(Math.random() * enemy.stolenItems.length);
+                let returned = enemy.stolenItems.splice(idx, 1)[0];
+                if(returned.exec) returned.exec();
+                ownedItems.push(returned);
+                log(`<span class="log-heal">💀 [饥荒年代] 受到伤害，返还了道具：${returned.name}！</span>`);
+            }
+
             // 冰盾层数衰减：受击少一层
             if(defChar.isSnowBoss && defChar.iceShield > 0) {
                 defChar.iceShield--;
@@ -1577,6 +1696,17 @@ function checkDeath() {
         updateBattleUI(); updateTopBar(); checkZhenZhenBtn();
 
         if(player.hp <= 0) {
+            // 鼠群事件：抵抗鼠群失败不算死亡，而是回满状态通过
+            if(enemy && enemy.id === 'rat_horde') {
+                player.hp = player.maxHp;
+                log(`<span class="log-heal">🐀 [鼠群] 你被鼠群淹没，但凭借顽强的意志爬了出来，满血复活！</span>`);
+                updateBattleUI(); updateTopBar();
+                battleActive = false; clearTimeout(battleTimer);
+                endCombatCleanup();
+                log(`🏆 你从鼠群中幸存了！`); show('battle-end-btn');
+                document.getElementById('ult-btn').disabled = true;
+                return true;
+            }
             let locName = currentNode ? currentNode.name : (regionGrid ? '永冻雪地' : '未知之地');
             setTimeout(() => { hide('battle-screen'); hide('top-bar'); show('game-over-screen'); document.getElementById('end-title').innerHTML = "💀 寻宝失败 💀"; document.getElementById('end-desc').innerHTML = `你倒在了 <b>${locName}</b>。`; }, 1000);
         } else {
@@ -1633,9 +1763,9 @@ function handleAcquireItem(item) {
 function endCombat() {
     // 判断是否来自网格地图
     let fromGrid = (regionGrid !== null);
-    let isGridBoss = (enemy && (enemy.isSnowBoss || enemy.isCoastBoss || enemy.isJungleBoss));
-    let bossIdMap = { snow_boss_mob: 'snow_boss', coast_boss_mob: 'coast_boss', jungle_boss_mob: 'jungle_boss' };
-    let regionNameMap = { snow: '冰原', coast: '海岸', jungle: '丛林' };
+    let isGridBoss = (enemy && (enemy.isSnowBoss || enemy.isCoastBoss || enemy.isJungleBoss || enemy.isRatBoss));
+    let bossIdMap = { snow_boss_mob: 'snow_boss', coast_boss_mob: 'coast_boss', jungle_boss_mob: 'jungle_boss', famine_era: 'rat_boss' };
+    let regionNameMap = { snow: '冰原', coast: '海岸', jungle: '丛林', rat: '鼠鼠家园' };
 
     let dropGold = (isGridBoss || (currentNode && currentNode.type === 'boss')) ? Math.floor(Math.random()*30+60) : Math.floor(Math.random()*15 + 15);
     gold += dropGold; updateTopBar();
@@ -1652,7 +1782,7 @@ function endCombat() {
     if(hasAltar) {
         let progress = 1;
         if(enemy && enemy.isElite) progress = 2;
-        if(enemy && (enemy.isSnowBoss || enemy.isCoastBoss || enemy.isJungleBoss)) progress = 4;
+        if(enemy && (enemy.isSnowBoss || enemy.isCoastBoss || enemy.isJungleBoss || enemy.isRatBoss)) progress = 4;
         window._altarProgress = (window._altarProgress || 0) + progress;
         log(`<span class="log-skill">⛩️ [祭坛] 进度 +${progress}（当前 ${window._altarProgress}）</span>`);
         while(window._altarProgress >= 4) {
@@ -1680,7 +1810,7 @@ function endCombat() {
         document.getElementById('battle-end-btn').innerText = `返回${regionName}`;
         document.getElementById('battle-end-btn').onclick = () => {
             hide('battle-screen');
-            if(defeatedBosses.length >= 3) {
+            if(defeatedBosses.length >= 4) {
                 hide('top-bar'); show('game-over-screen');
                 document.getElementById('end-title').innerHTML = "🎉 寻宝真神 🎉";
                 document.getElementById('end-desc').innerHTML = `你击败了所有Boss，找到了传说中的宝藏！`;
@@ -1729,7 +1859,7 @@ function endCombat() {
         document.getElementById('battle-end-btn').innerText = '继续冒险';
         document.getElementById('battle-end-btn').onclick = () => {
             hide('battle-screen');
-            if(defeatedBosses.length >= 3) {
+            if(defeatedBosses.length >= 4) {
                 hide('top-bar'); show('game-over-screen');
                 document.getElementById('end-title').innerHTML = "🎉 寻宝真神 🎉";
                 document.getElementById('end-desc').innerHTML = `你击败了所有Boss，找到了传说中的宝藏！`;

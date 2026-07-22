@@ -11,9 +11,10 @@ const worldMap = {
         icon: '🌅',
         desc: '你已经来到了这片大地，你需要做的只是寻宝，关于一切都不需要在意了。',
         options: [
-            { text: '睁开眼睛发现身处大陆', result: { type: 'random', targets: ['snow_start', 'coast_start', 'jungle_start'] } },
+            { text: '睁开眼睛发现身处大陆', result: { type: 'random', targets: ['snow_start', 'coast_start', 'jungle_start', 'rat_start'] } },
             { text: '转过身感到一片寒意', result: { type: 'goto', target: 'snow_start' } },
-            { text: '抬起头发现植被茂密', result: { type: 'goto', target: 'jungle_start' } }
+            { text: '抬起头发现植被茂密', result: { type: 'goto', target: 'jungle_start' } },
+            { text: '听到鼠群窸窣声', result: { type: 'goto', target: 'rat_start' } }
         ]
     },
 
@@ -183,6 +184,62 @@ const worldMap = {
             { text: '前往海岸', result: { type: 'goto', target: 'coast_start' } },
             { text: '返回世界起点', result: { type: 'goto', target: 'start' } }
         ]
+    },
+
+    // ==================== 鼠鼠家园地图 ====================
+    rat_start: {
+        id: 'rat_start',
+        name: '鼠鼠家园入口',
+        type: 'event',
+        icon: '🐀',
+        desc: '空气中弥漫着谷物的霉味，墙角的啃咬痕迹密密麻麻，远处传来鼠群奔涌的窸窣声。',
+        options: [
+            { text: '深入鼠巢', result: { type: 'goto', target: 'rat_1' } },
+            { text: '搜索废弃仓库', result: { type: 'goto', target: 'rat_shop' } }
+        ]
+    },
+    rat_1: {
+        id: 'rat_1',
+        name: '鼠道纵横',
+        type: 'combat',
+        icon: '🐀',
+        desc: '无数鼠道在地下交错，鼠群的尖叫声从四面八方传来！',
+        mobBias: 'rat',
+        next: 'rat_2',
+        reward: true
+    },
+    rat_shop: {
+        id: 'rat_shop',
+        name: '鼠巢黑市',
+        type: 'shop',
+        icon: '🕳️',
+        desc: '一间被鼠群占据的废弃杂货铺，货物散落一地，但还有不少能用的东西。',
+        next: 'rat_2'
+    },
+    rat_2: {
+        id: 'rat_2',
+        name: '饥荒中心',
+        type: 'event',
+        icon: '💀',
+        desc: '大地的裂缝中传来低沉的回响，鼠群似乎在这里汇聚，饥荒的气息令人窒息。',
+        options: [
+            { text: '踏入饥荒深渊', result: { type: 'goto', target: 'rat_boss' } },
+            { text: '返回雪地', result: { type: 'goto', target: 'snow_start' } },
+            { text: '前往丛林', result: { type: 'goto', target: 'jungle_start' } }
+        ]
+    },
+    rat_boss: {
+        id: 'rat_boss',
+        name: '饥荒年代',
+        type: 'boss',
+        icon: '💀',
+        desc: '深渊中，一尊由饥饿与贪婪凝聚的恐怖存在正注视着你。它身上挂着无数被掠夺的宝物，那是每个冒险者的噩梦。',
+        bossId: 'famine_era',
+        nextOptions: [
+            { text: '前往雪地', result: { type: 'goto', target: 'snow_start' } },
+            { text: '前往海岸', result: { type: 'goto', target: 'coast_start' } },
+            { text: '返回世界起点', result: { type: 'goto', target: 'start' } }
+        ]
     }
 };
 
@@ -190,11 +247,11 @@ const worldMap = {
 const regionMeta = {
     snow: { name: '永冻雪地', icon: '❄️', color: '#38bdf8', nodes: ['snow_start','snow_1','snow_shop','snow_2','snow_boss'] },
     coast: { name: '风暴海岸', icon: '🌊', color: '#22d3ee', nodes: ['coast_start','coast_1','coast_shop','coast_2','coast_boss'] },
-    jungle: { name: '瘴气丛林', icon: '🌿', color: '#4ade80', nodes: ['jungle_start','jungle_1','jungle_shop','jungle_2','jungle_boss'] }
+    jungle: { name: '瘴气丛林', icon: '🌿', color: '#4ade80', nodes: ['jungle_start','jungle_1','jungle_shop','jungle_2','jungle_boss'] },
+    rat: { name: '鼠鼠家园', icon: '🐀', color: '#a78bfa', nodes: ['rat_start','rat_1','rat_shop','rat_2','rat_boss'] }
 };
 
-// Boss 列表（用于通关判定）
-const bossNodes = ['snow_boss', 'coast_boss', 'jungle_boss'];
+const bossNodes = ['snow_boss', 'coast_boss', 'jungle_boss', 'rat_boss'];
 
 // ==================== 冰原事件池 ====================
 // 用于网格地图中随机填充每个格子的事件
@@ -1188,9 +1245,161 @@ function assignEventsToNodes(nodes, eventPool, regionId) {
     });
 }
 
+// 【鼠鼠家园专属怪物】
+const ratMobs = {
+    // 小怪
+    rat_scout: { id:'rat_scout', icon: '🐀', name: '鼠探子', hp: 50, maxHp: 50, atk: 10, speed: 14, desc:'鼠群中的侦察兵，速度极快', special: 'swift' },
+    rat_warrior: { id:'rat_warrior', icon: '🐀', name: '鼠战士', hp: 80, maxHp: 80, atk: 13, speed: 9, desc:'身经百战的鼠群战士，攻击附带撕裂', special: 'bleed' },
+    rat_plague: { id:'rat_plague', icon: '🦠', name: '疫鼠', hp: 45, maxHp: 45, atk: 11, speed: 8, desc:'携带瘟疫的老鼠，攻击有几率让敌人中毒', special: 'poison' },
+    // 精英
+    rat_king: { id:'rat_king', icon: '👑', name: '鼠王', hp: 240, maxHp: 240, atk: 18, speed: 6, desc:'鼠群的领袖，每回合召唤小老鼠协助攻击', special: 'summon', isElite: true },
+    rat_giant: { id:'rat_giant', icon: '🐀', name: '巨型鼠', hp: 300, maxHp: 300, atk: 14, speed: 4, desc:'变异后的巨鼠，皮糙肉厚', special: 'tank', isElite: true },
+    // 特殊事件怪物：鼠群（抵抗鼠群选项，数值极高）
+    rat_horde: { id:'rat_horde', icon: '🐀', name: '鼠群', hp: 500, maxHp: 500, atk: 30, speed: 15, crit: 10, lifesteal: 0, dodge: 0, desc:'铺天盖地的鼠群，数量庞大到令人绝望', special: 'horde', isElite: true }
+};
+
+// ==================== 鼠鼠家园事件池 ====================
+const ratEvents = [
+    {
+        id: 're_rat_invasion',
+        name: '鼠患来袭',
+        icon: '🐀',
+        desc: '饥荒后鼠群来袭，遮天蔽日的老鼠从四面八方涌来，为了存活你不得不面对这恐怖的一幕。',
+        type: 'event',
+        options: [
+            { text: '抵抗鼠群', result: { type: 'combat', mobId: 'rat_horde' } },
+            { text: '放任鼠群', result: { type: 'custom', action: 'rat_ignore' } },
+            { text: '成为鼠群', result: { type: 'custom', action: 'rat_become' } }
+        ]
+    },
+    {
+        id: 're_granary_ruin',
+        name: '粮仓废墟',
+        icon: '🏚️',
+        desc: '一座被鼠群洗劫过的粮仓，废墟中似乎还残留着一些未被发现的东西。',
+        type: 'event',
+        options: [
+            { text: '翻找残留粮食', result: { type: 'gold', amount: 30 } },
+            { text: '在废墟中休息', result: { type: 'heal', amount: 0.2, text: '找到了一些干粮，恢复20%生命' } },
+            { text: '警惕地离开', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 're_rat_tunnel',
+        name: '鼠道迷宫',
+        icon: '🕳️',
+        desc: '地面下密密麻麻的鼠道交错纵横，形成了一个复杂的地下迷宫。',
+        type: 'event',
+        options: [
+            { text: '深入探索', result: { type: 'combat', mobId: 'rat_warrior' } },
+            { text: '寻找出口', result: { type: 'move' } },
+            { text: '顺着鼠道走', result: { type: 'gold', amount: 20 } }
+        ]
+    },
+    {
+        id: 're_rat_nest_shop',
+        name: '废弃巢穴',
+        icon: '🕳️',
+        desc: '一处被遗弃的鼠巢，角落里堆着一些从各处收集来的杂物，似乎有些还能用。',
+        type: 'shop',
+        options: [
+            { text: '翻找有用物品', result: { type: 'shop' } },
+            { text: '不感兴趣', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 're_hungry_rats',
+        name: '饥饿的鼠群',
+        icon: '🐀',
+        desc: '一群瘦骨嶙峋的老鼠眼冒绿光地盯着你，它们已经饿了好几天了。',
+        type: 'event',
+        options: [
+            { text: '主动出击', result: { type: 'combat', mobId: 'rat_scout' } },
+            { text: '丢出食物引开', result: { type: 'gold', amount: -8, text: '你丢出了一些食物，鼠群蜂拥而上' } },
+            { text: '悄悄后退', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 're_grain_thief',
+        name: '偷粮贼',
+        icon: '🐀',
+        desc: '一只肥硕的老鼠正在偷吃你的存粮，它看到你后毫不畏惧，反而龇牙咧嘴。',
+        type: 'event',
+        options: [
+            { text: '赶走它', result: { type: 'combat', mobId: 'rat_plague' } },
+            { text: '分享食物', result: { type: 'heal', amount: -10, text: '你和老鼠分享了食物，损失10生命' } },
+            { text: '无视它', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 're_rat_plague',
+        name: '鼠疫蔓延',
+        icon: '🦠',
+        desc: '空气中弥漫着腐败的气味，鼠群带来的瘟疫正在这片区域蔓延。',
+        type: 'event',
+        options: [
+            { text: '采集草药防疫', result: { type: 'heal', amount: -15, text: '服用了苦涩的草药，损失15生命' } },
+            { text: '快速通过', result: { type: 'move' } },
+            { text: '寻找干净水源', result: { type: 'heal', amount: 0.15, text: '找到干净水源清洗，恢复15%生命' } }
+        ]
+    },
+    {
+        id: 're_rat_treasure',
+        name: '鼠群宝藏',
+        icon: '💎',
+        desc: '鼠群在巢穴中囤积了大量亮闪闪的物品，其中不乏珍贵的宝物。',
+        type: 'event',
+        options: [
+            { text: '冒险取宝', result: { type: 'gold', amount: 40 } },
+            { text: '仔细挑选', result: { type: 'gold', amount: 20 } },
+            { text: '不要惊动鼠群', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 're_rat_ambush',
+        name: '鼠群伏击',
+        icon: '🐀',
+        desc: '你踏入了一片看似平静的区域，但脚下的地面突然塌陷，鼠群从四面八方涌出！',
+        type: 'event',
+        options: [
+            { text: '正面突围', result: { type: 'combat', mobId: 'rat_king' } },
+            { text: '寻找突破口', result: { type: 'move' } }
+        ]
+    },
+    {
+        id: 're_rat_combat_random',
+        name: '鼠群遭遇',
+        icon: '🐀',
+        desc: '前方传来窸窸窣窣的声音，一群老鼠正朝你这边涌来。',
+        type: 'combat_random',
+        options: [
+            { text: '迎战', result: { type: 'combat_random' } }
+        ]
+    }
+];
+
+// ==================== 鼠鼠家园Boss事件：饥荒年代 ====================
+const ratBossEvent = {
+    id: 'se_rat_boss',
+    name: '饥荒年代',
+    icon: '💀',
+    desc: '你来到了鼠群的最深处，这里曾是繁荣的粮仓，如今只剩下无尽的饥荒与绝望。一尊由饥饿与贪婪凝聚的恐怖存在正注视着你。',
+    type: 'boss',
+    options: [
+        { text: '点燃粮仓', result: { type: 'boss_combat', mode: 'fire' } },
+        { text: '正面迎战', result: { type: 'boss_combat', mode: 'normal' } },
+        { text: '潜入破坏', result: { type: 'boss_combat', mode: 'stealth' } }
+    ]
+};
+
 // 兼容旧调用：冰原网格
 function generateSnowGrid() {
     return generateRegionGrid(snowEvents, snowBossEvent, 'snow');
+}
+
+// 兼容旧调用：鼠鼠家园网格
+function generateRatGrid() {
+    return generateRegionGrid(ratEvents, ratBossEvent, 'rat');
 }
 
 

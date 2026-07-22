@@ -8,6 +8,9 @@ const baseCharData = {
     xiaonaigou: { id:'xiaonaigou', icon:'🐱', name:'肖奈沟', hp:150, maxHp:150, atk:8, speed:9, crit:0, lifesteal:0, dodge:0, desc:'【天赋】每受到一次伤害，敌人有50%概率降低5%攻击力（可叠加）。', ultDesc:'【终结】天赋累计降低敌人攻击≥10%时可触发：自身攻击力提升敌人已降低的攻击力百分比！' }
 };
 
+// 【鼠群变身角色】（不可直接选择，通过事件获得）
+const ratSwarmChar = { id:'ratswarm', icon:'🐀', name:'鼠群', hp:200, maxHp:200, atk:15, speed:12, crit:5, lifesteal:0, dodge:5, desc:'【变身】你化身鼠群，在饥荒年代中生存。注意：连续3次移动不战斗，之后每移动一次扣10%血。', ultDesc:'【变身限定】无终结技' };
+
 // 【敌方图鉴】
 const mobTemplates = [
     { id:'m1', icon: '👾', name: '摸鱼小兵', hp: 60, maxHp: 60, atk: 7, speed: 5, desc:'基础属性平庸，练手专用' },
